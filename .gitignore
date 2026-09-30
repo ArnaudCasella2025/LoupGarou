@@ -1,0 +1,5 @@
+secret/
+entree/
+__pycache__/
+.pytest_cache/
+*.tmp

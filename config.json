@@ -1,0 +1,26 @@
+{
+  "humain": "Arnaud",
+  "nb_ia": 7,
+  "prenoms_ia": [
+    {"nom": "Marc", "genre": "m"},
+    {"nom": "Léa", "genre": "f"},
+    {"nom": "Camille", "genre": "f"},
+    {"nom": "Julien", "genre": "m"},
+    {"nom": "Sophie", "genre": "f"},
+    {"nom": "Thomas", "genre": "m"},
+    {"nom": "Élodie", "genre": "f"},
+    {"nom": "Hugo", "genre": "m"},
+    {"nom": "Chloé", "genre": "f"},
+    {"nom": "Nicolas", "genre": "m"}
+  ],
+  "vote_mode": "solo",
+  "reveal_roles": true,
+  "human_can_die": false,
+  "voyante": false,
+  "max_paroles_par_microtour": 3,
+  "max_mots_message": 40,
+  "vue_max_messages": 30,
+  "vue_max_declarations": 10,
+  "modele_agents": "haiku",
+  "surcout_tokens_par_appel": 900
+}

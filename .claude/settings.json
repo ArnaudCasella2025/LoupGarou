@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python engine.py *)",
+      "Bash(python3 engine.py *)",
+      "Bash(python -m pytest*)",
+      "Bash(python3 -m pytest*)"
+    ],
+    "deny": [
+      "Read(./secret/**)",
+      "Edit(./secret/**)",
+      "Bash(*secret/*)",
+      "Bash(*secret/)",
+      "Bash(* secret)",
+      "Bash(*roles.json*)",
+      "Bash(*log.jsonl*)",
+      "Bash(*etat.json*)",
+      "Bash(*LG_ETAT_DIR*)"
+    ]
+  }
+}

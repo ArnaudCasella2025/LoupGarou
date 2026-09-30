@@ -399,7 +399,7 @@ Tu es le LOUP-GAROU. Personne d'autre ne le sait. Si tu es éliminé, tu as perd
     fiche = `Ton rôle : Voyante
 Tu es la VOYANTE, dans le camp des villageois. Chaque nuit tu apprends le rôle exact d'un joueur. Tes visions réelles : ${vs.length ? vs.map(v => `nuit ${v.nuit} : ${v.joueur} est ${v.role}`).join(" ; ") : "aucune pour l'instant"}.
 - Tes messages privés au juge ${h} sont invisibles pour tous les autres, le Loup compris : transmets-lui CHAQUE vision, même innocente, en privé (canal "prive", "a":"${h}", "revendique":"voyante" et "vision").
-- Si une vision désigne le Loup, dis-le aussi en public en le visant : tu seras sans doute dévorée ensuite, alors agis tout de suite.
+- Si une vision désigne le Loup, dis-le aussi en public en le visant : tu seras sans doute dévorée ensuite, alors agis tout de suite. Tu peux faire les deux dans la même réponse : message public qui vise le Loup, plus un "prive" au juge avec ta vision.
 - N'appelle « vision » que ce que tu as réellement vu (liste ci-dessus). Une déduction se présente comme une déduction (« je déduis que… »), sans champ "vision".
 - Une vision qui innocente quelqu'un te sert à le défendre. Si quelqu'un d'autre se prétend Voyante, c'est le Loup : dis-le.${attente.length ? `\nÀ FAIRE MAINTENANT : tu n'as pas encore transmis au juge ${attente.map(v => `ta vision « ${v.joueur} est ${v.role} »`).join(" et ")}. Envoie-la-lui en privé dans ce message.` : ""}`;
   } else fiche = `Ton rôle : ${lab}
@@ -462,11 +462,13 @@ Réponds UNIQUEMENT par un objet JSON sur une ligne, en commençant par "reflexi
 {"reflexion":"...","carnet":{"<prénom>":[<0-100>,"<raison>"]},"action":"passer"}
 {"reflexion":"...","carnet":{...},"action":"parler","canal":"public","a":"tous","texte":"...","vise":"<prénom ou null>","revendique":null}
 {"reflexion":"...","carnet":{...},"action":"parler","canal":"prive","a":"<prénom d'un vivant, le juge compris>","texte":"...","vise":"<prénom ou null>","revendique":null}
+{"reflexion":"...","carnet":{...},"action":"parler","canal":"public","a":"tous","texte":"...","vise":"<prénom ou null>","revendique":null,"prive":{"a":"<prénom>","texte":"...","vise":null,"revendique":null}}
 - reflexion : ton raisonnement privé d'abord (faits, qui ment, que faire), 50 mots maximum. Personne ne le lira pendant la partie.
 - carnet : pour chaque autre vivant, ${loup ? "la menace qu'il représente pour toi" : "la probabilité (0-100) qu'il soit le Loup"} et une raison de 10 mots maximum. Reprends et corrige ton carnet précédent.
 - texte : français, ${c.maxMots} mots maximum, à la première personne, dans ta personnalité, appuyé sur des faits du journal.
 - vise : le joueur que ton message accuse, ou null.
-- revendique : ${c.voyante ? `null, "villageois" ou "voyante" ; avec "voyante", ajoute "vision":{"joueur":"<prénom>","loup":true ou false}.` : `null ou "villageois".`}`;
+- revendique : ${c.voyante ? `null, "villageois" ou "voyante" ; avec "voyante", ajoute "vision":{"joueur":"<prénom>","loup":true ou false}.` : `null ou "villageois".`}
+- prive (facultatif, seulement avec "canal":"public") : un message privé à une seule personne, envoyé en même temps que ton message public (par exemple dire une chose au juge en privé tout en parlant à tous). Mêmes champs et mêmes limites qu'un message ; ne l'ajoute que s'il est utile.`;
   if (S.phase === "nuit") return `## Nuit ${S.jour} — consigne identique pour tous les joueurs
 - "victime" : si tu es le Loup-Garou, la personne que tu dévores. Sinon mets quand même un prénom : leurre ignoré. Choix possibles : ${ciblesNuit(nom).join(", ")}.
 - "sonde" : ${c.voyante ? `si tu es la Voyante, le joueur dont tu veux connaître le rôle (choix : ${ciblesSonde(nom).join(", ")}) ; sinon un prénom quelconque (ignoré).` : "null."}
@@ -491,32 +493,47 @@ function lireCarnet(o, nom) {   // facultatif et tolérant : une entrée mal for
   }
   return Object.keys(out).length ? out : null;
 }
+function lireParole(o, nom, tolerant) {
+  if (typeof o.texte !== "string" || !o.texte.trim()) throw new Invalide('"texte" manquant');
+  const nbMots = nettoyer(o.texte).split(" ").length;
+  if (!tolerant && nbMots > S.cfg.maxMots) throw new Invalide(`ton texte fait ${nbMots} mots : reformule-le en ${S.cfg.maxMots} mots maximum, sans rien couper au milieu d'une phrase`);
+  const texte = nettoyer(o.texte, S.cfg.maxMots); verifierRevelation(texte, nom);
+  if (APPROBATION.test(texte)) throw new Invalide("ne commence pas en approuvant quelqu'un (« X a raison ») : dis directement ce que tu apportes");
+  if (S.log.filter(m => m.de === nom).slice(-6).some(m => tropProche(m.texte, texte))) throw new Invalide("tu as déjà dit presque la même chose : apporte un fait nouveau, ou passe");
+  if (S.log.filter(m => m.a === TOUS && m.de !== MJ && m.de !== nom).slice(-10).some(m => tropProche(m.texte, texte, 0.55)))
+    throw new Invalide("ton message reprend presque mot pour mot ce qu'un autre joueur vient de dire : apporte un fait ou un argument nouveau, ou passe");
+  const vise = resoudre(o.vise, S.vivants.filter(n => n !== nom && n !== humain()));   // facultatif ; le juge ne peut pas être visé
+  let revendique = ["villageois", "voyante"].includes(o.revendique) ? o.revendique : null;
+  if (revendique === "voyante" && !S.cfg.voyante) revendique = null;
+  let vision = null;
+  if (revendique === "voyante" && o.vision && typeof o.vision === "object") {
+    const jv = resoudre(o.vision.joueur, S.joueurs.map(x => x.nom).filter(n => n !== nom && n !== humain()));
+    if (jv && typeof o.vision.loup === "boolean") vision = { joueur: jv, loup: o.vision.loup };
+  }
+  if (vision && S.roles[nom] === "voyante" && !visionsDe(nom).some(v => v.joueur === vision.joueur && v.loup === vision.loup))
+    throw new Invalide(`tu n'as pas eu cette vision (tes visions : ${visionsDe(nom).map(v => `${v.joueur} est ${v.role}`).join(", ") || "aucune"}) ; présente une déduction comme une déduction, sans champ vision`);
+  return { texte, vise, revendique, vision };
+}
 function valider(nom, brut, tolerant = false) {
   const o = extraireJSON(brut);
   if (S.phase === "jour") {
     const base = { carnet: lireCarnet(o.carnet, nom), reflexion: typeof o.reflexion === "string" ? nettoyer(o.reflexion, 60) : null };
     if (o.action === "passer") return { ...base, action: "passer" };
     if (o.action !== "parler") throw new Invalide('"action" doit valoir "passer" ou "parler"');
-    if (typeof o.texte !== "string" || !o.texte.trim()) throw new Invalide('"texte" manquant');
-    const nbMots = nettoyer(o.texte).split(" ").length;
-    if (!tolerant && nbMots > S.cfg.maxMots) throw new Invalide(`ton texte fait ${nbMots} mots : reformule-le en ${S.cfg.maxMots} mots maximum, sans rien couper au milieu d'une phrase`);
-    const texte = nettoyer(o.texte, S.cfg.maxMots); verifierRevelation(texte, nom);
-    if (APPROBATION.test(texte)) throw new Invalide("ne commence pas en approuvant quelqu'un (« X a raison ») : dis directement ce que tu apportes");
-    if (S.log.filter(m => m.de === nom).slice(-6).some(m => tropProche(m.texte, texte))) throw new Invalide("tu as déjà dit presque la même chose : apporte un fait nouveau, ou passe");
-    if (S.log.filter(m => m.a === TOUS && m.de !== MJ && m.de !== nom).slice(-10).some(m => tropProche(m.texte, texte, 0.55)))
-      throw new Invalide("ton message reprend presque mot pour mot ce qu'un autre joueur vient de dire : apporte un fait ou un argument nouveau, ou passe");
-    const vise = resoudre(o.vise, S.vivants.filter(n => n !== nom && n !== humain()));   // facultatif ; le juge ne peut pas être visé
-    let revendique = ["villageois", "voyante"].includes(o.revendique) ? o.revendique : null;
-    if (revendique === "voyante" && !S.cfg.voyante) revendique = null;
-    let vision = null;
-    if (revendique === "voyante" && o.vision && typeof o.vision === "object") {
-      const jv = resoudre(o.vision.joueur, S.joueurs.map(x => x.nom).filter(n => n !== nom && n !== humain()));
-      if (jv && typeof o.vision.loup === "boolean") vision = { joueur: jv, loup: o.vision.loup };
+    const msg = { ...base, action: "parler", ...lireParole(o, nom, tolerant) };
+    if (o.canal === "public") {
+      const r = { ...msg, a: TOUS };
+      if (o.prive && typeof o.prive === "object") {   // message privé glissé en plus du public (un seul)
+        try {
+          const a = resoudre(o.prive.a, S.vivants.filter(n => n !== nom));
+          if (!a) throw new Invalide('"a" doit être un autre joueur vivant');
+          r.prive = { a, ...lireParole(o.prive, nom, tolerant) };
+        } catch (e) {
+          if (!(e instanceof Invalide) || !tolerant) throw new Invalide(`message privé ajouté : ${e.message}`);
+        }
+      }
+      return r;
     }
-    if (vision && S.roles[nom] === "voyante" && !visionsDe(nom).some(v => v.joueur === vision.joueur && v.loup === vision.loup))
-      throw new Invalide(`tu n'as pas eu cette vision (tes visions : ${visionsDe(nom).map(v => `${v.joueur} est ${v.role}`).join(", ") || "aucune"}) ; présente une déduction comme une déduction, sans champ vision`);
-    const msg = { ...base, action: "parler", texte, vise, revendique, vision };
-    if (o.canal === "public") return { ...msg, a: TOUS };
     if (o.canal === "prive") { const a = resoudre(o.a, S.vivants.filter(n => n !== nom)); if (!a) throw new Invalide('"a" doit être un autre joueur vivant'); return { ...msg, a }; }
     throw new Invalide('"canal" doit valoir "public" ou "prive"');
   }
@@ -561,8 +578,11 @@ function fauxAgent(nom) {
   const carnet = Object.fromEntries(sansH.map(n => [n, [Math.floor(hasard() * 100), "impression"]]));
   const base = { reflexion: "Je relis les faits.", carnet };
   const attente = visionsEnAttente(nom)[0];
-  if (attente) return JSON.stringify({ ...base, action: "parler", canal: "prive", a: humain(), texte: `Je suis la Voyante : cette nuit j'ai vu que ${attente.joueur} est ${attente.role}.`,
-    vise: attente.loup ? attente.joueur : null, revendique: "voyante", vision: { joueur: attente.joueur, loup: attente.loup } });
+  if (attente) {
+    const pv = { a: humain(), texte: `Je suis la Voyante : cette nuit j'ai vu que ${attente.joueur} est ${attente.role}.`, vise: attente.loup ? attente.joueur : null, revendique: "voyante", vision: { joueur: attente.joueur, loup: attente.loup } };
+    if (attente.loup) return JSON.stringify({ ...base, action: "parler", canal: "public", a: TOUS, texte: `Regardez bien ${attente.joueur} : ses arguments ne tiennent pas depuis ce matin.`, vise: attente.joueur, prive: pv });
+    return JSON.stringify({ ...base, action: "parler", canal: "prive", ...pv });
+  }
   if (S.attentes[nom]) return JSON.stringify({ ...base, action: "parler", canal: "public", a: TOUS, texte: choix(FAUX.defense), vise: null });
   const r = hasard();
   if (r < 0.45) return JSON.stringify({ ...base, action: "passer" });
@@ -649,16 +669,20 @@ function resoudreJour(reps) {
   const t3 = parleurs.filter(n => !t0.includes(n) && !t1.includes(n) && !t2.includes(n));
   const choisis = [...melanger(t0), ...melanger(t1), ...melanger(t2), ...melanger(t3)].slice(0, S.cfg.cap);
   const prio = [];
-  for (const n of choisis) {
-    const r = reps[n], extra = {};
+  const cle = x => `${x.de}|${x.role}|${x.vision ? x.vision.joueur + x.vision.loup : ""}|${x.a === TOUS}`;
+  const publier = (n, r) => {
+    const extra = {};
     if (r.vise) extra.vise = r.vise;
     if (r.revendique) { extra.revendique = r.revendique; if (r.vision) extra.vision = r.vision; }
     const m = ajouter(n, r.a, r.texte, null, extra);
-    const cle = x => `${x.de}|${x.role}|${x.vision ? x.vision.joueur + x.vision.loup : ""}|${x.a === TOUS}`;
     const rv = r.revendique && { id: m.id, jour: S.jour, de: n, a: r.a, role: r.revendique, vision: r.vision || null };
     if (rv && !S.revendications.some(x => cle(x) === cle(rv))) S.revendications.push(rv);
-    delete S.attentes[n];
     if (ias().includes(r.a) && !prio.includes(r.a)) prio.push(r.a);
+  };
+  for (const n of choisis) {
+    publier(n, reps[n]);
+    if (reps[n].prive) publier(n, reps[n].prive);   // même prise de parole
+    delete S.attentes[n];
   }
   S.priorite = prio; S.frustres = parleurs.filter(n => !choisis.includes(n)); S.microtour++;
   if (!choisis.length) ajouter(MJ, humain(), "Personne ne prend la parole.");

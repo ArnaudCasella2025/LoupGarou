@@ -285,15 +285,15 @@ function nouvellePartie(opts) {
   const lesIA = noms.map(n => n[0]);
   const loup = choix(lesIA); roles[loup] = "loup";
   if (opts.voyante) roles[choix(lesIA.filter(n => n !== loup))] = "voyante";
-  S = { version: 2, cfg: { ...opts, cap: 3, maxMots: 50, maxVue: 30, maxDecl: 10, consultes: 4 }, joueurs, roles, vivants: joueurs.map(j => j.nom), morts: [],
+  S = { version: 2, cfg: { ...opts, cap: 4, maxMots: 50, maxVue: 30, maxDecl: 10, consultes: 5 }, joueurs, roles, vivants: joueurs.map(j => j.nom), morts: [],
         jour: 1, phase: "jour", microtour: 1, priorite: [], frustres: [], voteHumain: null, log: [], coulisses: [], gagnant: null,
         votes: [], resumes: {}, notes: {}, attentes: {}, carnets: {}, reflexions: {}, revendications: [],
-        visions: [], sansElimination: [], dernierAppel: {}, tick: 0,
+        visions: [], sansElimination: [], dernierAppel: {}, tick: 0, silence: {}, parole: null,
         compteur: { appels: 0, relances: 0, tin: 0, tout: 0 } };
   annonce(`[Jour 1] Le jour se lève. Vivants : ${S.vivants.join(", ")}.`);
 }
 function migrer(etat) {   // parties sauvegardées avant l'ajout des carnets et revendications
-  for (const [k, v] of Object.entries({ votes: [], resumes: {}, notes: {}, attentes: {}, carnets: {}, reflexions: {}, revendications: [], visions: [], sansElimination: [], dernierAppel: {}, tick: 0 }))
+  for (const [k, v] of Object.entries({ votes: [], resumes: {}, notes: {}, attentes: {}, carnets: {}, reflexions: {}, revendications: [], visions: [], sansElimination: [], dernierAppel: {}, tick: 0, silence: {}, parole: null }))
     if (etat[k] == null) etat[k] = v;
   return etat;
 }
@@ -457,12 +457,13 @@ Tu es ${f ? "une" : "un"} ${lab}. Tu ne connais le rôle de personne. Objectifs 
 function consigne(nom) {
   const c = S.cfg, h = humain(), loup = S.roles[nom] === "loup";
   if (S.phase === "jour") return `## À toi de jouer (Jour ${S.jour}, micro-tour ${S.microtour})
-Au plus ${c.cap} joueurs parlent par micro-tour. Si le juge t'attend, tu DOIS parler. Sinon, passe si tu n'as rien de neuf à apporter.
+Donne ton "envie" de parler maintenant, de 0 à 100 (100 : on t'accuse, le juge t'interpelle, ou tu as une information cruciale ; 20 : une petite remarque). Prépare ton message même si ton envie est faible : le moteur décide qui parle. Plus il y a de joueurs qui veulent parler, plus il faut d'envie pour prendre la parole ; quand personne ne parle, même une petite envie suffit. Si le juge t'attend, tu DOIS parler. Passe seulement si tu n'as vraiment rien à dire.
 Réponds UNIQUEMENT par un objet JSON sur une ligne, en commençant par "reflexion" :
 {"reflexion":"...","carnet":{"<prénom>":[<0-100>,"<raison>"]},"action":"passer"}
-{"reflexion":"...","carnet":{...},"action":"parler","canal":"public","a":"tous","texte":"...","vise":"<prénom ou null>","revendique":null}
-{"reflexion":"...","carnet":{...},"action":"parler","canal":"prive","a":"<prénom d'un vivant, le juge compris>","texte":"...","vise":"<prénom ou null>","revendique":null}
-{"reflexion":"...","carnet":{...},"action":"parler","canal":"public","a":"tous","texte":"...","vise":"<prénom ou null>","revendique":null,"prive":{"a":"<prénom>","texte":"...","vise":null,"revendique":null}}
+{"reflexion":"...","carnet":{...},"action":"parler","envie":<0-100>,"canal":"public","a":"tous","texte":"...","vise":"<prénom ou null>","revendique":null}
+{"reflexion":"...","carnet":{...},"action":"parler","envie":<0-100>,"canal":"prive","a":"<prénom d'un vivant, le juge compris>","texte":"...","vise":"<prénom ou null>","revendique":null}
+{"reflexion":"...","carnet":{...},"action":"parler","envie":<0-100>,"canal":"public","a":"tous","texte":"...","vise":"<prénom ou null>","revendique":null,"prive":{"a":"<prénom>","texte":"...","vise":null,"revendique":null}}
+- envie : 0 à 100, honnête ; la gonfler sans raison lasse le village.
 - reflexion : ton raisonnement privé d'abord (faits, qui ment, que faire), 50 mots maximum. Personne ne le lira pendant la partie.
 - carnet : pour chaque autre vivant, ${loup ? "la menace qu'il représente pour toi" : "la probabilité (0-100) qu'il soit le Loup"} et une raison de 10 mots maximum. Reprends et corrige ton carnet précédent.
 - texte : français, ${c.maxMots} mots maximum, à la première personne, dans ta personnalité, appuyé sur des faits du journal.
@@ -520,7 +521,8 @@ function valider(nom, brut, tolerant = false) {
     const base = { carnet: lireCarnet(o.carnet, nom), reflexion: typeof o.reflexion === "string" ? nettoyer(o.reflexion, 60) : null };
     if (o.action === "passer") return { ...base, action: "passer" };
     if (o.action !== "parler") throw new Invalide('"action" doit valoir "passer" ou "parler"');
-    const msg = { ...base, action: "parler", ...lireParole(o, nom, tolerant) };
+    const envie = typeof o.envie === "number" && isFinite(o.envie) ? Math.max(0, Math.min(100, Math.round(o.envie))) : 50;
+    const msg = { ...base, action: "parler", envie, ...lireParole(o, nom, tolerant) };
     if (o.canal === "public") {
       const r = { ...msg, a: TOUS };
       if (o.prive && typeof o.prive === "object") {   // message privé glissé en plus du public (un seul)
@@ -576,7 +578,7 @@ function fauxAgent(nom) {
   }
   if (S.phase === "vote") return JSON.stringify({ vote: hasard() < 0.5 && ciblesVote(nom).includes(S.voteHumain) ? S.voteHumain : choix(ciblesVote(nom)) });
   const carnet = Object.fromEntries(sansH.map(n => [n, [Math.floor(hasard() * 100), "impression"]]));
-  const base = { reflexion: "Je relis les faits.", carnet };
+  const base = { reflexion: "Je relis les faits.", carnet, envie: Math.floor(hasard() * 100) };
   const attente = visionsEnAttente(nom)[0];
   if (attente) {
     const pv = { a: humain(), texte: `Je suis la Voyante : cette nuit j'ai vu que ${attente.joueur} est ${attente.role}.`, vise: attente.loup ? attente.joueur : null, revendique: "voyante", vision: { joueur: attente.joueur, loup: attente.loup } };
@@ -624,7 +626,7 @@ function verifier(nom, brut) {
 function aConsulter() {
   // Le jour, on ne consulte que les IA qui doivent parler, puis celles qu'on n'a pas consultées depuis le plus longtemps.
   const tous = ias(); if (S.phase !== "jour") return tous;
-  const n = S.cfg.consultes || 4, liste = [], add = x => { if (!liste.includes(x)) liste.push(x); };
+  const n = S.cfg.consultes || 5, liste = [], add = x => { if (!liste.includes(x)) liste.push(x); };
   tous.filter(x => S.attentes[x]?.fort || visionsEnAttente(x).length || S.priorite.includes(x)).forEach(add);
   tous.filter(x => S.frustres.includes(x)).forEach(x => { if (liste.length < n) add(x); });
   const reste = melanger(tous.filter(x => !liste.includes(x))).sort((a, b) => (S.dernierAppel[a] ?? -1) - (S.dernierAppel[b] ?? -1));
@@ -662,12 +664,9 @@ function resoudreJour(reps) {
     if (reps[n]?.reflexion) S.reflexions[n] = { jour: S.jour, texte: reps[n].reflexion };
   }
   const parleurs = ias().filter(n => reps[n]?.action === "parler");
-  const fort = n => S.attentes[n]?.fort, faible = n => S.attentes[n] && !S.attentes[n].fort;
-  const t0 = parleurs.filter(fort);
-  const t1 = parleurs.filter(n => !t0.includes(n) && (S.priorite.includes(n) || faible(n)));
-  const t2 = parleurs.filter(n => !t0.includes(n) && !t1.includes(n) && S.frustres.includes(n));
-  const t3 = parleurs.filter(n => !t0.includes(n) && !t1.includes(n) && !t2.includes(n));
-  const choisis = [...melanger(t0), ...melanger(t1), ...melanger(t2), ...melanger(t3)].slice(0, S.cfg.cap);
+  const { choisis, seuil, scores } = choisirParole(parleurs, reps);
+  S.parole = { seuil, candidats: parleurs.length };
+  for (const n of ias()) S.silence[n] = choisis.includes(n) ? 0 : (S.silence[n] || 0) + 1;
   const prio = [];
   const cle = x => `${x.de}|${x.role}|${x.vision ? x.vision.joueur + x.vision.loup : ""}|${x.a === TOUS}`;
   const publier = (n, r) => {
@@ -686,6 +685,31 @@ function resoudreJour(reps) {
   }
   S.priorite = prio; S.frustres = parleurs.filter(n => !choisis.includes(n)); S.microtour++;
   if (!choisis.length) ajouter(MJ, humain(), "Personne ne prend la parole.");
+  else if (S.frustres.length) {   // une « main levée » visible : qui voulait parler et n'a pas franchi le seuil
+    const forts = S.frustres.filter(n => scores[n] >= seuil - 15);
+    ajouter(MJ, humain(), `Voulaient aussi parler : ${S.frustres.map(n => forts.includes(n) ? `${n} (de justesse)` : n).join(", ")}.`);
+  }
+}
+function choisirParole(parleurs, reps) {
+  // Seuil de parole : plus la demande (somme des envies) est forte, plus il faut d'envie pour parler ;
+  // quand peu de joueurs veulent parler, le seuil baisse et même une petite envie suffit.
+  const demande = parleurs.reduce((t, n) => t + reps[n].envie / 100, 0);
+  const seuil = Math.round(Math.max(15, Math.min(90, 28 + 14 * demande)));
+  const scores = {};
+  for (const n of parleurs) {
+    const att = S.attentes[n];
+    scores[n] = reps[n].envie
+      + (att?.fort ? 40 : 0)                                         // interpellé par le juge
+      + (!att?.fort && (att || S.priorite.includes(n)) ? 15 : 0)    // question générale, ou message privé reçu
+      + (S.frustres.includes(n) ? 10 : 0)                             // voulait déjà parler au tour précédent
+      + Math.min(20, 4 * (S.silence[n] || 0))                         // gêne du silence
+      + Math.round(hasard() * 16 - 8);                                // un peu d'imprévu
+  }
+  const tri = parleurs.slice().sort((a, b) => scores[b] - scores[a]);
+  const choisis = tri.filter(n => S.attentes[n]?.fort);                    // qui te doit une réponse parle toujours
+  for (const n of tri) if (!choisis.includes(n) && scores[n] >= seuil) choisis.push(n);
+  if (!choisis.length && tri.length) choisis.push(tri[0]);                  // le silence pèse : le plus motivé finit par parler
+  return { choisis: choisis.slice(0, Math.max(S.cfg.cap, choisis.filter(n => S.attentes[n]?.fort).length)), seuil, scores };
 }
 function mourir(n, type, cause) {
   const role = S.cfg.reveal ? roleLabel(n) : null;
@@ -1035,7 +1059,7 @@ function rendreScene() {
       bEl.onclick = () => { if (cible.value) { aConfirmer = cible.value; rendre(); } };
       const attendus = Object.entries(S.attentes).filter(([, a]) => a.fort).map(([n]) => n);
       const prio = S.priorite.filter(n => S.vivants.includes(n) && !attendus.includes(n));
-      const infos = ["Au plus 3 IA parlent par tour"];
+      const infos = [S.parole ? `Seuil de parole : ${S.parole.seuil} (${S.parole.candidats} voulai${S.parole.candidats > 1 ? "ent" : "t"} parler)` : "Chaque IA parle selon son envie"];
       if (attendus.length) infos.push(`${attendus.join(", ")} ${attendus.length > 1 ? "te doivent" : "te doit"} une réponse`);
       if (prio.length) infos.push(`${prio.join(", ")} répondr${prio.length > 1 ? "ont" : "a"} en priorité`);
       infos.push(S.cfg.source === "claude" ? `IA : Claude ${S.cfg.niveau === "default" ? "(plus fines)" : "(rapides)"}` : "IA factices");
@@ -1145,7 +1169,7 @@ function rendrePreparation(sc) {
     el("p", null, "Tu es le seul humain du village, villageois et juge. Sept villageois IA t'entourent ; l'un d'eux est un Loup-Garou. Le jour, tout le monde parle, en public ou à l'oreille. Tu élimines qui tu veux, quand tu veux. La nuit, le loup dévore quelqu'un."));
   const ul = el("ul");
   ["Tu as au plus 3 éliminations : après trois erreurs, le loup gagne. Les IA le savent aussi et se défendent.",
-   "Au plus 3 IA parlent à chaque tour. Nomme une IA ou écris-lui en privé : elle te doit une réponse et parle en priorité.",
+   "Chaque IA a une envie de parler. Plus elles sont nombreuses à vouloir parler, plus il faut d'envie pour prendre la parole ; quand le village se tait, même les timides finissent par parler. Nomme une IA ou écris-lui en privé : elle te doit une réponse et passe en priorité.",
    "Chaque IA garde un carnet de soupçons privé d'un tour à l'autre ; tu le découvres au débrief.",
    "La Voyante te transmet ses visions en privé ; le loup peut prétendre être Voyante lui aussi. À toi de trancher.",
    "Tu peux passer une journée sans éliminer personne, mais le loup dévore quand même quelqu'un la nuit.",

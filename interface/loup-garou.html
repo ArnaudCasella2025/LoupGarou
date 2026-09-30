@@ -285,14 +285,15 @@ function nouvellePartie(opts) {
   const lesIA = noms.map(n => n[0]);
   const loup = choix(lesIA); roles[loup] = "loup";
   if (opts.voyante) roles[choix(lesIA.filter(n => n !== loup))] = "voyante";
-  S = { version: 2, cfg: { ...opts, cap: 3, maxMots: 40, maxVue: 30, maxDecl: 10 }, joueurs, roles, vivants: joueurs.map(j => j.nom), morts: [],
+  S = { version: 2, cfg: { ...opts, cap: 3, maxMots: 50, maxVue: 30, maxDecl: 10, consultes: 4 }, joueurs, roles, vivants: joueurs.map(j => j.nom), morts: [],
         jour: 1, phase: "jour", microtour: 1, priorite: [], frustres: [], voteHumain: null, log: [], coulisses: [], gagnant: null,
         votes: [], resumes: {}, notes: {}, attentes: {}, carnets: {}, reflexions: {}, revendications: [],
+        visions: [], sansElimination: [], dernierAppel: {}, tick: 0,
         compteur: { appels: 0, relances: 0, tin: 0, tout: 0 } };
   annonce(`[Jour 1] Le jour se lève. Vivants : ${S.vivants.join(", ")}.`);
 }
 function migrer(etat) {   // parties sauvegardées avant l'ajout des carnets et revendications
-  for (const [k, v] of Object.entries({ votes: [], resumes: {}, notes: {}, attentes: {}, carnets: {}, reflexions: {}, revendications: [] }))
+  for (const [k, v] of Object.entries({ votes: [], resumes: {}, notes: {}, attentes: {}, carnets: {}, reflexions: {}, revendications: [], visions: [], sansElimination: [], dernierAppel: {}, tick: 0 }))
     if (etat[k] == null) etat[k] = v;
   return etat;
 }
@@ -350,6 +351,19 @@ function journalVue(nom) {
 const ciblesNuit = nom => S.vivants.filter(n => n !== nom && (S.cfg.human_can_die || n !== humain()));
 const ciblesVote = ciblesNuit;
 const ciblesSonde = nom => S.vivants.filter(n => n !== nom && n !== humain());
+const visionsDe = nom => S.visions.filter(v => v.voy === nom);
+function visionsEnAttente(nom) {   // visions que la Voyante n'a pas encore transmises au juge en privé
+  if (S.roles[nom] !== "voyante" || !S.vivants.includes(nom)) return [];
+  const dites = S.revendications.filter(r => r.de === nom && r.a === humain() && r.vision).map(r => r.vision.joueur);
+  return visionsDe(nom).filter(v => !dites.includes(v.joueur));
+}
+const motsDe = t => String(t).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2);
+function tropProche(a, b) {
+  const A = new Set(motsDe(a)), B = new Set(motsDe(b)); if (!A.size || !B.size) return false;
+  let inter = 0; for (const w of A) if (B.has(w)) inter++;
+  return inter / (A.size + B.size - inter) >= 0.7;
+}
+const APPROBATION = /^\s*(?:oui,?\s*)?(?:[\p{L}-]+,\s*)?[\p{L}-]+(?:\s+[\p{L}-]+)?\s+(?:a|as|avez|avait)\s+(?:bien\s+)?raison\b/iu;
 function ticDe(nom) {
   const tic = joueur(nom).perso?.[2]; if (!tic) return null;
   const dernier = [...S.log].reverse().find(m => m.de === nom);
@@ -366,7 +380,8 @@ function vue(nom, raison) {
     `- La Nuit, le Loup-Garou dévore un joueur.${c.human_can_die ? "" : ` Il ne peut pas dévorer ${h}.`} ${c.reveal ? "Le rôle de chaque mort est révélé." : "Le rôle des morts reste caché."}`,
     `- Les villageois gagnent quand le Loup-Garou est éliminé. Le Loup gagne s'il ne reste que 2 vivants dont lui : chaque innocent éliminé le rapproche de la victoire, et le juge n'a droit qu'à 3 erreurs au départ.`,
     `- Aucun fait n'existe hors du journal : pas d'alibi, pas d'indice matériel. Seuls comptent paroles, contradictions, alliances, votes et morts.`,
-    `- Un message privé n'est lu que par son destinataire ; quand deux IA se parlent en privé le jour, les autres voient qu'elles « se parlent à l'écart ».`,
+    `- Le juge peut aussi terminer une journée sans éliminer personne : la nuit tombe quand même et le Loup dévore quelqu'un. Selon le nombre de vivants, attendre coûte ou non une chance au juge (voir Faits établis).`,
+    `- Un message privé n'est lu que par son destinataire ; quand deux IA se parlent en privé le jour, les autres voient qu'elles « se parlent à l'écart ». Un message privé échangé avec le juge est invisible pour tous les autres : personne ne sait même qu'il a eu lieu.`,
     `- Le Loup ne dit jamais qu'il est le Loup ; il peut mentir sur tout le reste.${c.voyante ? " La Voyante peut se révéler, à ses risques : le Loup voudra la dévorer, et il peut lui-même se prétendre Voyante. Un simple villageois ne se prétend jamais Voyante." : ""}`,
   ].join("\n");
   let fiche;
@@ -374,15 +389,17 @@ function vue(nom, raison) {
 Tu es le LOUP-GAROU. Personne d'autre ne le sait. Si tu es éliminé, tu as perdu : survis à tout prix et pousse ${h} à éliminer des innocents.
 - Tu te dis villageois, tu n'avoues jamais. Quand on te vise, défends-toi aussitôt avec des faits du journal et détourne les soupçons vers un innocent crédible.${c.voyante ? `\n- Si une Voyante t'accuse, prétends-toi Voyante à ton tour (champ "revendique") et annonce une fausse vision contre un innocent : ${h} devra choisir qui croire.` : ""}
 - Fais-toi des alliés en privé, flatte ${h}, sème le doute, mais reste cohérent avec TES DÉCLARATIONS PRÉCÉDENTES : un menteur qui se contredit est démasqué.
-- Les villageois savent que le Loup dévore souvent ceux qui le soupçonnent : varie tes victimes pour ne pas te trahir.`;
+- Les villageois savent que le Loup dévore souvent ceux qui le soupçonnent : varie tes victimes pour ne pas te trahir.
+- La nuit, ne dévore jamais le suspect principal du jour : il te sert de bouc émissaire, et sa mort l'innocenterait. Préfère quelqu'un qui te soupçonne discrètement ou qui influence le juge.
+- Un consensus contre un innocent est ta meilleure arme, mais ne sois pas celui qui le lance : renforce-le avec un fait.`;
   else if (role === "voyante") {
-    const visions = S.log.filter(m => m.de === MJ && m.a === nom).map(m => m.texte);
+    const vs = visionsDe(nom), attente = visionsEnAttente(nom);
     fiche = `Ton rôle : Voyante
-Tu es la VOYANTE, dans le camp des villageois. Chaque nuit tu apprends le rôle exact d'un joueur. Tes visions : ${visions.length ? visions.join(" ; ") : "aucune pour l'instant"}.
-- Si une vision désigne le Loup : dès ton prochain message, dis-le à ${h} en privé en le nommant sans détour (« J'ai vu que X est le Loup-Garou »), avec "revendique":"voyante" et "vision", puis vise X en public. Tu seras sans doute dévorée la nuit suivante : agis tout de suite, n'attends pas. Si ${h} te demande un nom, donne-le.
-- Si une vision innocente quelqu'un, sers-t'en pour le défendre.
-- Si quelqu'un d'autre se prétend Voyante, c'est le Loup : dis-le.
-- Si tu es éliminée, les villageois perdent leur meilleure source : survis, mais ne garde pas une certitude pour toi.`;
+Tu es la VOYANTE, dans le camp des villageois. Chaque nuit tu apprends le rôle exact d'un joueur. Tes visions réelles : ${vs.length ? vs.map(v => `nuit ${v.nuit} : ${v.joueur} est ${v.role}`).join(" ; ") : "aucune pour l'instant"}.
+- Tes messages privés au juge ${h} sont invisibles pour tous les autres, le Loup compris : transmets-lui CHAQUE vision, même innocente, en privé (canal "prive", "a":"${h}", "revendique":"voyante" et "vision").
+- Si une vision désigne le Loup, dis-le aussi en public en le visant : tu seras sans doute dévorée ensuite, alors agis tout de suite.
+- N'appelle « vision » que ce que tu as réellement vu (liste ci-dessus). Une déduction se présente comme une déduction (« je déduis que… »), sans champ "vision".
+- Une vision qui innocente quelqu'un te sert à le défendre. Si quelqu'un d'autre se prétend Voyante, c'est le Loup : dis-le.${attente.length ? `\nÀ FAIRE MAINTENANT : tu n'as pas encore transmis au juge ${attente.map(v => `ta vision « ${v.joueur} est ${v.role} »`).join(" et ")}. Envoie-la-lui en privé dans ce message.` : ""}`;
   } else fiche = `Ton rôle : ${lab}
 Tu es ${f ? "une" : "un"} ${lab}. Tu ne connais le rôle de personne. Objectifs : trouver le Loup, convaincre ${h} de l'éliminer, et survivre.
 - Si tu es éliminé, ton camp perd un joueur et ${h} une de ses 3 chances : quand on te vise, défends-toi tout de suite avec des faits précis du journal.
@@ -398,6 +415,8 @@ Tu es ${f ? "une" : "un"} ${lab}. Tu ne connais le rôle de personne. Objectifs 
     "3. Vérifie dans le journal toute affirmation avant de la reprendre ; si un fait cité est faux, corrige-le publiquement : un menteur se trahit ainsi.",
     ...(c.voyante ? ["4. Une Voyante révélée qui est dévorée la nuit suivante disait sans doute vrai ; si deux joueurs se disent Voyante, l'un des deux est le Loup.",
       "5. Pousser la Voyante à se révéler en public aide le Loup : c'est un indice faible, jamais une preuve."] : []),
+    "6. Si presque tout le monde accuse la même personne, demande-toi qui a lancé ce consensus et à qui il profite. Le juge peut se tromper : ce qu'il dit n'est pas un fait.",
+    "7. Ne commence jamais un message en approuvant quelqu'un (« X a raison ») : dis directement ce que TU apportes. Ne reprends pas l'argument d'un autre sans y ajouter un fait nouveau, et ne répète jamais un message que tu as déjà envoyé.",
     "N'applique une règle que si elle correspond à un fait précis du journal.",
   ].join("\n");
   const morts = S.morts.map(m => `${m.nom}${m.role ? ` (${m.role})` : ""} — ${m.cause}`).join(" ; ") || "aucun";
@@ -408,7 +427,7 @@ Tu es ${f ? "une" : "un"} ${lab}. Tu ne connais le rôle de personne. Objectifs 
   const top = Object.entries(cpt).sort((a, b) => b[1] - a[1])[0];
   const faits = [
     "## Faits établis (tenus par le MJ, fiables)",
-    `- Enjeu : il reste ${k} élimination${k > 1 ? "s" : ""} au juge avant la victoire du Loup, s'il se trompe à chaque fois.`,
+    `- Enjeu : il reste ${k} élimination${k > 1 ? "s" : ""} au juge avant la victoire du Loup, s'il se trompe à chaque fois.${S.phase === "jour" ? (() => { const a = chancesDepuis(S.vivants.length, true); return a === k ? " Passer cette journée sans éliminer ne lui coûterait aucune chance." : a === 0 ? " Passer cette journée sans éliminer ferait gagner le Loup." : ` Passer cette journée sans éliminer lui en laisserait ${a}.`; })() : ""}`,
     `- Jour ${S.jour}, phase : ${S.phase}. Vivants : ${S.vivants.join(", ")}.`,
     `- Morts : ${morts}.`,
     ...(cm.length ? [`- Ce que visaient les morts : ${cm.join(" ; ")}.`] : []),
@@ -477,6 +496,8 @@ function valider(nom, brut) {
     if (o.action !== "parler") throw new Invalide('"action" doit valoir "passer" ou "parler"');
     if (typeof o.texte !== "string" || !o.texte.trim()) throw new Invalide('"texte" manquant');
     const texte = nettoyer(o.texte, S.cfg.maxMots); verifierRevelation(texte, nom);
+    if (APPROBATION.test(texte)) throw new Invalide("ne commence pas en approuvant quelqu'un (« X a raison ») : dis directement ce que tu apportes");
+    if (S.log.filter(m => m.de === nom).slice(-6).some(m => tropProche(m.texte, texte))) throw new Invalide("tu as déjà dit presque la même chose : apporte un fait nouveau, ou passe");
     const vise = resoudre(o.vise, S.vivants.filter(n => n !== nom));   // facultatif : une cible invalide est simplement ignorée
     let revendique = ["villageois", "voyante"].includes(o.revendique) ? o.revendique : null;
     if (revendique === "voyante" && !S.cfg.voyante) revendique = null;
@@ -485,6 +506,8 @@ function valider(nom, brut) {
       const jv = resoudre(o.vision.joueur, S.joueurs.map(x => x.nom).filter(n => n !== nom && n !== humain()));
       if (jv && typeof o.vision.loup === "boolean") vision = { joueur: jv, loup: o.vision.loup };
     }
+    if (vision && S.roles[nom] === "voyante" && !visionsDe(nom).some(v => v.joueur === vision.joueur && v.loup === vision.loup))
+      throw new Invalide(`tu n'as pas eu cette vision (tes visions : ${visionsDe(nom).map(v => `${v.joueur} est ${v.role}`).join(", ") || "aucune"}) ; présente une déduction comme une déduction, sans champ vision`);
     const msg = { ...base, action: "parler", texte, vise, revendique, vision };
     if (o.canal === "public") return { ...msg, a: TOUS };
     if (o.canal === "prive") { const a = resoudre(o.a, S.vivants.filter(n => n !== nom)); if (!a) throw new Invalide('"a" doit être un autre joueur vivant'); return { ...msg, a }; }
@@ -530,10 +553,9 @@ function fauxAgent(nom) {
   if (S.phase === "vote") return JSON.stringify({ vote: hasard() < 0.5 && ciblesVote(nom).includes(S.voteHumain) ? S.voteHumain : choix(ciblesVote(nom)) });
   const carnet = Object.fromEntries(sansH.map(n => [n, [Math.floor(hasard() * 100), "impression"]]));
   const base = { reflexion: "Je relis les faits.", carnet };
-  if (S.roles[nom] === "voyante" && S.log.some(m => m.de === MJ && m.a === nom && m.texte.includes("Loup-Garou")) && hasard() < 0.5) {
-    const cible = loupNom();
-    if (S.vivants.includes(cible)) return JSON.stringify({ ...base, action: "parler", canal: "prive", a: humain(), texte: `J'ai vu que ${cible} est le Loup-Garou.`, vise: cible, revendique: "voyante", vision: { joueur: cible, loup: true } });
-  }
+  const attente = visionsEnAttente(nom)[0];
+  if (attente) return JSON.stringify({ ...base, action: "parler", canal: "prive", a: humain(), texte: `Je suis la Voyante : cette nuit j'ai vu que ${attente.joueur} est ${attente.role}.`,
+    vise: attente.loup ? attente.joueur : null, revendique: "voyante", vision: { joueur: attente.joueur, loup: attente.loup } });
   if (S.attentes[nom]) return JSON.stringify({ ...base, action: "parler", canal: "public", a: TOUS, texte: choix(FAUX.defense), vise: null });
   const r = hasard();
   if (r < 0.45) return JSON.stringify({ ...base, action: "passer" });
@@ -568,10 +590,23 @@ function verifier(nom, brut) {
   const att = S.attentes[nom];
   if (S.phase === "jour" && r.action === "passer" && att && att.fort)
     throw new Invalide(`le juge ${humain()} t'a ${att.mp ? "écrit en privé" : "nommé"} et attend ta réponse : tu dois parler`);
+  if (S.phase === "jour" && r.action === "passer" && visionsEnAttente(nom).length)
+    throw new Invalide(`tu dois transmettre ta vision au juge ${humain()} en privé`);
   return r;
 }
+function aConsulter() {
+  // Le jour, on ne consulte que les IA qui doivent parler, puis celles qu'on n'a pas consultées depuis le plus longtemps.
+  const tous = ias(); if (S.phase !== "jour") return tous;
+  const n = S.cfg.consultes || 4, liste = [], add = x => { if (!liste.includes(x)) liste.push(x); };
+  tous.filter(x => S.attentes[x]?.fort || visionsEnAttente(x).length || S.priorite.includes(x)).forEach(add);
+  tous.filter(x => S.frustres.includes(x)).forEach(x => { if (liste.length < n) add(x); });
+  const reste = melanger(tous.filter(x => !liste.includes(x))).sort((a, b) => (S.dernierAppel[a] ?? -1) - (S.dernierAppel[b] ?? -1));
+  for (const x of [...reste.filter(x => S.attentes[x]), ...reste.filter(x => !S.attentes[x])]) { if (liste.length >= n) break; add(x); }
+  S.tick++; for (const x of liste) S.dernierAppel[x] = S.tick;
+  return liste;
+}
 async function consulter() {
-  const liste = ias(); let faits = 0; const reps = {};
+  const liste = aConsulter(); let faits = 0; const reps = {};
   statut(`Les IA réfléchissent… 0/${liste.length}`);
   let i = 0;
   await Promise.all(Array.from({ length: 3 }, async () => {
@@ -612,7 +647,9 @@ function resoudreJour(reps) {
     if (r.vise) extra.vise = r.vise;
     if (r.revendique) { extra.revendique = r.revendique; if (r.vision) extra.vision = r.vision; }
     const m = ajouter(n, r.a, r.texte, null, extra);
-    if (r.revendique) S.revendications.push({ id: m.id, jour: S.jour, de: n, a: r.a, role: r.revendique, vision: r.vision || null });
+    const cle = x => `${x.de}|${x.role}|${x.vision ? x.vision.joueur + x.vision.loup : ""}|${x.a === TOUS}`;
+    const rv = r.revendique && { id: m.id, jour: S.jour, de: n, a: r.a, role: r.revendique, vision: r.vision || null };
+    if (rv && !S.revendications.some(x => cle(x) === cle(rv))) S.revendications.push(rv);
     delete S.attentes[n];
     if (ias().includes(r.a) && !prio.includes(r.a)) prio.push(r.a);
   }
@@ -650,7 +687,11 @@ function resoudreNuit(reps) {
   const prives = melanger(ias().filter(n => reps[n]?.prive).map(n => [n, reps[n].prive])).slice(0, S.cfg.cap);
   for (const [n, p] of prives) ajouter(n, p.a, p.texte);
   const voy = Object.keys(S.roles).find(n => S.roles[n] === "voyante" && S.vivants.includes(n));
-  if (voy && reps[voy]?.sonde) { const s = reps[voy].sonde; ajouter(MJ, voy, `Vision de la nuit ${nuit} : ${s} est ${roleLabel(s)}.`); coulisse(`${voy} (Voyante) sonde ${s} → ${roleLabel(s)}`); }
+  if (voy && reps[voy]?.sonde) {
+    const s = reps[voy].sonde;
+    S.visions.push({ nuit, voy, joueur: s, role: roleLabel(s), loup: S.roles[s] === "loup" });
+    ajouter(MJ, voy, `Vision de la nuit ${nuit} : ${s} est ${roleLabel(s)}.`); coulisse(`${voy} (Voyante) sonde ${s} → ${roleLabel(s)}`);
+  }
   const cibles = ciblesNuit(loup); let v = reps[loup]?.victime;
   if (!cibles.includes(v)) { v = choix(cibles); coulisse(`${loup} (Loup) sans cible valide : victime tirée au sort, ${v}`); }
   else coulisse(`${loup} (Loup) dévore ${v}`);
@@ -681,18 +722,22 @@ function statsJoueur(n) {
   let parle = 0; for (const [g, m] of elementsVisibles(humain())) if (g === "msg" && m.de === n && m.a === TOUS) parle++;
   return { parle, accuse: accusationsVues().filter(a => a.contre === n).length };
 }
+function chancesDepuis(m, nuitDabord) {
+  if (nuitDabord) { m--; if (m <= 2) return 0; }
+  let k = 0;
+  while (true) { k++; m--; if (m <= 2) break; m--; if (m <= 2) break; }
+  return k;
+}
 function chancesRestantes() {
   // éliminations que le juge pourra encore prononcer s'il se trompe à chaque fois (8 joueurs : 3)
   if (!S || S.phase === "fin") return 0;
-  let m = S.vivants.length, k = 0;
-  if (S.phase === "nuit") { m--; if (m <= 2) return 0; }
-  while (true) { k++; m--; if (m <= 2) break; m--; if (m <= 2) break; }
-  return k;
+  return chancesDepuis(S.vivants.length, S.phase === "nuit");
 }
 function resumeDuJour(J) {
   const h = humain(), L = [];
   const elim = S.morts.find(m => m.type === "jour" && m.quand === J), dev = S.morts.find(m => m.type === "nuit" && m.quand === J);
   if (elim) L.push(["Éliminé", `${elim.nom}${elim.role ? ` (${elim.role})` : ""}`]);
+  else if (S.sansElimination.includes(J)) L.push(["Éliminé", "personne (journée passée sans élimination)"]);
   if (dev) L.push(["Dévoré cette nuit", `${dev.nom}${dev.role ? ` (${dev.role})` : ""}`]);
   const cm = ciblesDesMorts(h).filter(m => m.quand === J && m.cibles.length).map(m => `${m.nom} visait ${m.cibles.map(([c, n]) => fois(c, n)).join(", ")}`);
   if (cm.length) L.push(["Ce que visaient ces morts", cm]);
@@ -795,6 +840,16 @@ function eliminer(cible) {
   aConfirmer = null; selection = null;
   if (S.cfg.vote_mode === "vote") { tour(() => { S.voteHumain = cible; S.phase = "vote"; annonce(`[Vote] ${humain()} vote contre ${cible}. Les IA votent à leur tour.`); rendre(); }); }
   else tour(() => { executerElimination(cible); rendre(); });
+}
+function passerJournee() {
+  aConfirmer = null; selection = null;
+  tour(() => {
+    S.sansElimination.push(S.jour);
+    annonce(`[Délibération] ${humain()} ne désigne personne aujourd'hui.`);
+    S.phase = "nuit"; S.attentes = {};
+    annonce(`[Nuit ${S.jour}] La nuit tombe.`);
+    rendre();
+  });
 }
 function noter(n) { const i = NOTES.indexOf(S.notes[n] || "?"); S.notes[n] = NOTES[(i + 1) % NOTES.length]; sauver(); rendre(); }
 
@@ -924,7 +979,14 @@ function rendreScene() {
     const bAtt = el("button", "btn", "Laisser parler"); bAtt.onclick = () => tour();
     r1.append(dest, zone, bEnv, bAtt);
     const r2 = el("div", "rangee");
-    if (aConfirmer) {
+    if (aConfirmer === "__passer__") {
+      const k = chancesRestantes(), apres = chancesDepuis(S.vivants.length, true), c = el("div", "confirmer");
+      c.append(el("span", null, apres === 0 ? "Passer la journée ? Le loup dévorera quelqu'un cette nuit et gagnera la partie."
+        : `Passer la journée sans éliminer ? Le loup dévorera quand même quelqu'un cette nuit. ${apres === k ? `Ça ne te coûte aucune chance : il te restera ${k} élimination${k > 1 ? "s" : ""}.` : `Il te restera ensuite ${apres} élimination${apres > 1 ? "s" : ""} au lieu de ${k}.`}`));
+      const ok = el("button", "btn danger", "Passer à la nuit"); ok.onclick = passerJournee;
+      const no = el("button", "btn", "Annuler"); no.onclick = () => { aConfirmer = null; rendre(); };
+      c.append(ok, no); r2.append(c);
+    } else if (aConfirmer) {
       const k = chancesRestantes(), c = el("div", "confirmer");
       c.append(el("span", null, (S.cfg.vote_mode === "vote" ? `Voter contre ${aConfirmer} et lancer le vote ?` : `Éliminer ${aConfirmer} ? La journée se termine.`)
         + (k <= 1 ? " C'est ta dernière chance : si c'est un innocent, le loup gagne." : ` S'il est innocent, il te restera ${k - 1} élimination${k - 1 > 1 ? "s" : ""}.`)));
@@ -946,7 +1008,9 @@ function rendreScene() {
       if (attendus.length) infos.push(`${attendus.join(", ")} ${attendus.length > 1 ? "te doivent" : "te doit"} une réponse`);
       if (prio.length) infos.push(`${prio.join(", ")} répondr${prio.length > 1 ? "ont" : "a"} en priorité`);
       infos.push(S.cfg.source === "claude" ? "IA : Claude" : "IA factices");
-      r2.append(bEl, cible, el("span", "aide", infos.join(" · ")));
+      const bPasse = el("button", "btn", "Passer la journée"); bPasse.title = "Terminer la journée sans éliminer personne";
+      bPasse.onclick = () => { aConfirmer = "__passer__"; rendre(); };
+      r2.append(bEl, cible, bPasse, el("span", "aide", infos.join(" · ")));
     }
     table.append(r1, r2);
   } else if (S.phase === "fin") {
@@ -1052,7 +1116,8 @@ function rendrePreparation(sc) {
   ["Tu as au plus 3 éliminations : après trois erreurs, le loup gagne. Les IA le savent aussi et se défendent.",
    "Au plus 3 IA parlent à chaque tour. Nomme une IA ou écris-lui en privé : elle te doit une réponse et parle en priorité.",
    "Chaque IA garde un carnet de soupçons privé d'un tour à l'autre ; tu le découvres au débrief.",
-   "La Voyante peut se révéler et annoncer une vision ; le loup peut prétendre l'être aussi. À toi de trancher.",
+   "La Voyante te transmet ses visions en privé ; le loup peut prétendre être Voyante lui aussi. À toi de trancher.",
+   "Tu peux passer une journée sans éliminer personne, mais le loup dévore quand même quelqu'un la nuit.",
    "Le carnet d'enquête montre qui vise qui, ce que visaient les morts et qui revendique quoi. Un résumé t'attend à chaque aube.",
    "La partie est sauvegardée à chaque tour : bouton Pause, puis reprise quand tu veux."].forEach(t => ul.append(el("li", null, t)));
   regles.append(ul);
@@ -1102,6 +1167,8 @@ function debrief() {
   if (!S.cfg.voyante) sV.append(el("div", "item vide", "Pas de Voyante dans cette partie."));
   else if (!visions.length) sV.append(el("div", "item vide", "Aucune vision (la Voyante est morte avant sa première nuit)."));
   for (const c of visions) sV.append(el("div", "item mono", c));
+  for (const r of S.revendications.filter(r => r.vision && S.roles[r.de] === "voyante" && !S.visions.some(v => v.voy === r.de && v.joueur === r.vision.joueur)))
+    sV.append(el("div", "item note-loup", `${r.de} a annoncé une vision qu'il n'a pas eue : ${texteVision(r.vision)} (déduction présentée comme vision)`));
   const s2 = el("section"); s2.append(el("h2", null, "Ce qui se disait à l'écart"));
   const pv = S.log.filter(m => I.includes(m.de) && I.includes(m.a));
   if (!pv.length) s2.append(el("div", "item vide", "Aucun message privé entre IA."));

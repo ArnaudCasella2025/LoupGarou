@@ -50,9 +50,6 @@ h1 { font: 400 1.7rem/1 var(--f-display); margin: 0; letter-spacing: .02em; text
 @media (max-width: 1100px) {
   .corps, .corps.sans-enquete { grid-template-columns: 240px minmax(0, 1fr); }
   .onglet-enquete { display: inline-block; }
-  .enquete { display: none; }
-  .corps.voir-enquete .scene { display: none; }
-  .corps.voir-enquete .enquete { display: flex; }
 }
 @media (max-width: 760px) { .corps, .corps.sans-enquete { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; } }
 
@@ -136,6 +133,19 @@ h1 { font: 400 1.7rem/1 var(--f-display); margin: 0; letter-spacing: .02em; text
 .apartes { display: flex; flex-wrap: wrap; gap: 6px; }
 .apartes span { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px 2px 4px; }
 .apartes .portrait { --t: 16px; }
+/* sous 1100px, le carnet d'enquête remplace la chronique à la demande (déclaré après .enquete pour l'emporter) */
+@media (max-width: 1100px) {
+  .corps .enquete { display: none; }
+  .corps.voir-enquete .scene { display: none; }
+  .corps.voir-enquete .enquete { display: flex; }
+}
+@media (max-width: 760px) {
+  header { gap: 4px 12px; padding-block: 8px 6px; }
+  h1 { font-size: 1.25rem; }
+  .enjeu .chiffre.long { display: none; }
+  .outils { margin-left: 0; width: 100%; justify-content: space-between; }
+  .corps { gap: 10px; padding-block: 8px; }
+}
 
 /* table de parole */
 .table { border-top: 1px solid var(--line); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
@@ -590,7 +600,7 @@ function sauver() {
     let ou = "ce navigateur";
     if (STOCK.ref) { try { await STOCK.ref.set(d); ou = "ton compte"; } catch {} }
     const h = new Date(d.date);
-    document.getElementById("sauve").textContent = `Sauvegardé (${ou}) à ${String(h.getHours()).padStart(2, "0")}:${String(h.getMinutes()).padStart(2, "0")}`;
+    const sv = document.getElementById("sauve"); sv.textContent = `Sauvegardé ${String(h.getHours()).padStart(2, "0")}:${String(h.getMinutes()).padStart(2, "0")}`; sv.title = `Sauvegardé sur ${ou}`;
   });
 }
 
@@ -658,7 +668,7 @@ function rendreEnjeu() {
   if (!S || enPause || S.phase === "fin") return;
   const k = chancesRestantes();
   const pips = el("span", "pips"); for (let i = 0; i < 3; i++) pips.append(el("span", "pip" + (i < k ? " plein" : "")));
-  e.append(el("span", "chiffre", `${S.vivants.length}/8 vivants`), pips, el("span", "chiffre", `${k} élimination${k > 1 ? "s" : ""} avant la défaite`));
+  e.append(el("span", "chiffre", `${S.vivants.length}/8 vivants`), pips, el("span", "chiffre", `${k} élimination${k > 1 ? "s" : ""}`), el("span", "chiffre long", "avant la défaite"));
   e.title = "Si tu élimines un innocent à chaque fois, voici combien d'éliminations il te reste avant que le loup gagne.";
 }
 

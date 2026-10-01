@@ -1,0 +1,776 @@
+<title>Le Hameau vivant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : le village en temps réel (canvas, caméra qui suit le juge) | carnet de ce qu'on a vu et entendu. Au téléphone : village en haut, carnet dessous.
+   Un seul univers visuel assumé : veillée sombre autour d'un village éclairé par le jour puis la lanterne. */
+:root {
+  --bg: #11151d; --surface: #1a202b; --surface2: #222a37; --ink: #ece6d8; --muted: #9aa1ad; --line: #2e3746;
+  --candle: #e5a84b; --blood: #e0596f; --herbe: #6f8f4e;
+  --c0: #ee8d55; --c1: #6aa8d8; --c2: #7bbb70; --c3: #bd8fd4; --c4: #e2b24f; --c5: #5cc3ba; --c6: #de77a6;
+  --f-display: "IM Fell English SC", "Iowan Old Style", Georgia, serif;
+  --f-body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.4 var(--f-body); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+.app { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); max-width: 1500px; margin: 0 auto; padding-inline: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding-block: 10px; }
+h1 { font: 400 1.5rem/1 var(--f-display); margin: 0; letter-spacing: .02em; }
+.horloge { font: 500 .85rem var(--f-mono); color: var(--candle); letter-spacing: .05em; font-variant-numeric: tabular-nums; }
+.enjeu { display: flex; align-items: center; gap: 6px; font-size: .88rem; color: var(--muted); }
+.pip { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--blood); display: inline-block; }
+.pip.plein { background: var(--blood); }
+.outils { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 4px 11px; font-size: .9rem; }
+.btn:hover { border-color: var(--muted); }
+.btn.fort { background: var(--candle); color: #1a1408; border-color: var(--candle); font-weight: 700; }
+.corps { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; min-height: 0; padding-bottom: 14px; }
+@media (max-width: 860px) { .app { height: auto; } .corps { grid-template-columns: minmax(0, 1fr); } }
+.scene { position: relative; min-height: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #0c0f16; touch-action: none; }
+@media (max-width: 860px) { .scene { height: 64svh; } }
+canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+.aide { position: absolute; left: 10px; bottom: 10px; font-size: .8rem; color: var(--ink); background: color-mix(in srgb, #0c0f16 70%, transparent); padding: 4px 9px; border-radius: 6px; pointer-events: none; }
+.toast { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: min(560px, 90%); text-align: center;
+  background: color-mix(in srgb, #0c0f16 82%, transparent); border: 1px solid var(--line); border-radius: 9px; padding: 7px 14px; font-size: .95rem; pointer-events: none; }
+.toast em { color: var(--candle); font-style: normal; }
+
+/* dialogue avec un villageois */
+.dialogue { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(520px, calc(100% - 24px));
+  background: var(--surface); border: 1px solid var(--candle); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; box-shadow: 0 8px 30px #0008; }
+.dialogue .tete { display: flex; align-items: center; gap: 10px; }
+.dialogue .tete b { font: 400 1.15rem var(--f-display); }
+.dialogue .tete span { color: var(--muted); font-size: .85rem; }
+.dialogue .tete button { margin-left: auto; }
+.dialogue .rep { font-size: 1rem; min-height: 1.4em; }
+.dialogue .questions { display: flex; flex-wrap: wrap; gap: 6px; }
+.dialogue .questions button { border: 1px solid var(--line); background: var(--surface2); border-radius: 18px; padding: 5px 12px; font-size: .9rem; text-align: left; }
+.dialogue .questions button:hover { border-color: var(--candle); }
+.lent { font: .72rem var(--f-mono); color: var(--muted); letter-spacing: .05em; }
+
+/* conseil et fin */
+.voile { position: absolute; inset: 0; background: color-mix(in srgb, #06080d 70%, transparent); display: grid; place-items: center; padding: 14px; }
+.panneau { width: min(600px, 100%); max-height: 100%; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 10px; }
+.panneau h2 { font: 400 1.4rem var(--f-display); margin: 0; }
+.panneau p { margin: 0; }
+.avis { display: grid; gap: 6px; }
+.avis div { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; }
+.pastille { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font: 700 .75rem var(--f-body); color: #10131a; }
+.choix { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* carnet */
+.carnet { display: flex; flex-direction: column; min-height: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+@media (max-width: 860px) { .carnet { max-height: 46svh; } }
+.carnet h2 { font: 400 1rem var(--f-display); letter-spacing: .06em; margin: 0; padding: 10px 12px 6px; color: var(--muted); }
+.entrees { overflow: auto; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 7px; min-height: 0; }
+.entree { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 6px; font-size: .9rem; }
+.entree .h { font: .72rem var(--f-mono); color: var(--muted); padding-top: 3px; font-variant-numeric: tabular-nums; }
+.entree.annonce .t { color: var(--candle); }
+.entree.nuit .t { font-style: italic; }
+.entree .tag { font: 500 .66rem var(--f-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-right: 4px; }
+.entree.contradiction .t { border-left: 3px solid var(--blood); padding-left: 7px; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+
+<div class="app">
+  <header>
+    <h1>Le Hameau vivant</h1>
+    <span class="horloge" id="horloge">Jour 1 · 07:00</span>
+    <span class="enjeu" id="enjeu"></span>
+    <div class="outils">
+      <button class="btn" id="btn-pause" type="button">Pause</button>
+      <button class="btn" id="btn-vitesse" type="button">Vitesse ×1</button>
+      <button class="btn" id="btn-nouvelle" type="button">Nouvelle partie</button>
+    </div>
+  </header>
+  <div class="corps">
+    <div class="scene" id="scene">
+      <canvas id="cv" aria-label="Le village vu de dessus. Clique pour marcher, clique sur un villageois pour lui parler."></canvas>
+      <div class="toast" id="toast" hidden></div>
+      <div class="aide" id="aide">Clique pour marcher · clique un villageois pour lui parler · flèches ou ZQSD</div>
+      <div class="dialogue" id="dialogue" hidden></div>
+      <div class="voile" id="voile" hidden><div class="panneau" id="panneau"></div></div>
+    </div>
+    <aside class="carnet" aria-label="Carnet">
+      <h2>Carnet : vu, entendu, nuits</h2>
+      <div class="entrees" id="entrees" aria-live="polite"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+/* ============================================================ monde */
+const W = 1600, H = 1100;
+const LIEUX = {
+  place:    { nom: "la Place", a: "à la Place", de: "de la Place",    court: "Place",    x: 800,  y: 540, r: 125, trace: "boue" },
+  taverne:  { nom: "la Taverne", a: "à la Taverne", de: "de la Taverne",  court: "Taverne",  x: 800,  y: 235, r: 95,  trace: "bière" },
+  forge:    { nom: "la Forge", a: "à la Forge", de: "de la Forge",    court: "Forge",    x: 1190, y: 265, r: 90,  trace: "suie" },
+  chapelle: { nom: "la Chapelle", a: "à la Chapelle", de: "de la Chapelle", court: "Chapelle", x: 405,  y: 245, r: 90,  trace: "cire" },
+  grange:   { nom: "la Grange", a: "à la Grange", de: "de la Grange",   court: "Grange",   x: 370,  y: 585, r: 100, trace: "paille" },
+  moulin:   { nom: "le Moulin", a: "au Moulin", de: "du Moulin",   court: "Moulin",   x: 1235, y: 650, r: 90,  trace: "farine" },
+  lavoir:   { nom: "le Lavoir", a: "au Lavoir", de: "du Lavoir",   court: "Lavoir",   x: 820,  y: 885, r: 95,  trace: "eau" },
+};
+const CHEMINS = [["place","chapelle"],["place","taverne"],["place","forge"],["place","grange"],["place","moulin"],["place","lavoir"],
+  ["taverne","forge"],["forge","moulin"],["moulin","lavoir"],["lavoir","grange"],["grange","chapelle"],["taverne","chapelle"]];
+const MAISONS = [
+  { id: "o1", x: 175, y: 395, q: "Ouest" }, { id: "o2", x: 215, y: 770, q: "Ouest" }, { id: "o3", x: 470, y: 805, q: "Ouest" }, { id: "o4", x: 600, y: 700, q: "Ouest" },
+  { id: "e1", x: 1010, y: 410, q: "Est" }, { id: "e2", x: 1420, y: 395, q: "Est" }, { id: "e3", x: 1060, y: 735, q: "Est" }, { id: "e4", x: 1390, y: 150, q: "Est" },
+];
+const BERGERIE = { x: 165, y: 935 };
+const RIVIERE = [[1620, 470], [1400, 600], [1150, 800], [880, 960], [560, 1010], [250, 1050], [-20, 1080]];
+
+// graphe de marche : lieux + maisons (+ bergerie) reliés au lieu le plus proche
+const NOEUDS = {};
+for (const [id, L] of Object.entries(LIEUX)) NOEUDS[id] = { x: L.x, y: L.y, v: [] };
+const lier = (a, b) => { NOEUDS[a].v.push(b); NOEUDS[b].v.push(a); };
+for (const [a, b] of CHEMINS) lier(a, b);
+const lieuProche = (x, y) => Object.entries(LIEUX).sort(([, a], [, b]) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0][0];
+for (const m of MAISONS) { m.lieu = lieuProche(m.x, m.y); m.fenetre = m.lieu; NOEUDS[m.id] = { x: m.x, y: m.y + 30, v: [] }; lier(m.id, m.lieu); }
+NOEUDS.bergerie = { x: BERGERIE.x + 40, y: BERGERIE.y - 40, v: [] }; lier("bergerie", "grange");
+function cheminNoeuds(de, vers) {
+  const prec = { [de]: null }, file = [de];
+  while (file.length) { const n = file.shift(); if (n === vers) break; for (const v of NOEUDS[n].v) if (!(v in prec)) { prec[v] = n; file.push(v); } }
+  const out = []; for (let n = vers; n != null; n = prec[n]) out.unshift(n); return out;
+}
+const dans = (x, y) => { for (const [id, L] of Object.entries(LIEUX)) if (Math.hypot(L.x - x, L.y - y) < L.r) return id; return null; };
+
+/* ============================================================ hasard */
+const rnd = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+const pick = a => a[Math.floor(rnd() * a.length)];
+const melange = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+/* ============================================================ personnages */
+const PERSOS = [
+  { id: "meneur", label: "meneur autoritaire", matin: ["place"], midi: ["*foule"], aprem: ["place", "taverne"], dit: "Écoute-moi bien :", oreille: .3 },
+  { id: "parano", label: "paranoïaque", matin: ["forge", "taverne"], midi: ["forge", "chapelle"], aprem: ["forge"], dit: "Parle plus bas…", oreille: .75, fuit: true },
+  { id: "discret", label: "discret", matin: ["lavoir"], midi: ["moulin", "lavoir"], aprem: ["chapelle", "lavoir"], dit: "", oreille: .5 },
+  { id: "bavard", label: "bavard sympathique", matin: ["taverne"], midi: ["place"], aprem: ["taverne"], dit: "Tu sais quoi ?", oreille: .25 },
+  { id: "sceptique", label: "sceptique", matin: ["*trace"], midi: ["place", "moulin"], aprem: ["taverne"], dit: "Franchement,", oreille: .3 },
+  { id: "emotif", label: "émotif", matin: ["chapelle"], midi: ["grange", "chapelle"], aprem: ["chapelle", "place"], dit: "J'en tremble encore…", oreille: .35 },
+  { id: "stratege", label: "stratège", matin: ["forge", "place"], midi: ["*ailleurs"], aprem: ["place"], dit: "Réfléchis une seconde :", oreille: .3 },
+  { id: "naif", label: "naïf optimiste", matin: ["*suivre"], midi: ["*suivre", "lavoir"], aprem: ["place"], dit: "Oh,", oreille: .3 },
+];
+const PRENOMS = ["Marc", "Léa", "Hugo", "Camille", "Thomas", "Sophie", "Nicolas", "Élodie", "Julien", "Chloé"];
+const FEMININS = new Set(["Léa", "Camille", "Sophie", "Élodie", "Chloé"]);
+const accord = (nom, m, f) => FEMININS.has(nom) ? f : m;
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+const phrase = (dit, reste) => dit ? `${dit} ${reste}` : cap(reste);
+const COULEURS = ["#ee8d55", "#6aa8d8", "#7bbb70", "#bd8fd4", "#e2b24f", "#5cc3ba", "#de77a6"];
+const CHEVEUX = ["#3b2a1e", "#6b4a2b", "#c9a15a", "#1f1b18", "#8a3b22", "#5a4636", "#d8c7a0"];
+
+let G;   // état de la partie
+const VITESSE_JOUR = 3.4;   // minutes de jeu par seconde réelle
+const JOUR_DEBUT = 7 * 60, CLOCHE = 18 * 60 + 15, CONSEIL = 18 * 60 + 50;
+
+function nouvellePartie() {
+  const noms = melange(PRENOMS).slice(0, 7), persos = melange(PERSOS).slice(0, 7), maisons = melange(MAISONS);
+  const loup = Math.floor(rnd() * 7);
+  const ias = noms.map((nom, i) => ({ nom, i, perso: persos[i], couleur: COULEURS[i], cheveux: CHEVEUX[i], ia: true, loup: i === loup, vivant: true,
+    maison: maisons[i + 1], x: LIEUX.place.x, y: LIEUX.place.y, chemin: [], cible: null, lieu: "place", parle: null, cooldown: 0, vu: [], nuits: [], dernierLieu: null, prochain: 0, mensonges: 0 }));
+  const moi = { nom: "Toi", humain: true, couleur: "#f1e6c8", cheveux: "#2a211a", maison: maisons[0], x: LIEUX.place.x, y: LIEUX.place.y + 70, chemin: [], vivant: true };
+  G = { jour: 1, minute: JOUR_DEBUT, phase: "jour", ias, moi, morts: [], victimes: [], traces: [], chances: 3, pause: false, vitesse: 1, lent: false,
+    convs: [], cloche: false, journal: [], vuParMoi: new Set(), sons: [], silhouette: null, nuit: null, loupMarche: null, dialogueAvec: null, fin: null, flammes: 0 };
+  // placer tout le monde autour du feu
+  ias.forEach((c, k) => { const a = (k / 7) * Math.PI * 2; c.x = LIEUX.place.x + Math.cos(a) * 75; c.y = LIEUX.place.y + Math.sin(a) * 55; c.prochain = 1 + rnd() * 3; });
+  // prologue : nuit 0, le loup égorge un mouton à la bergerie
+  const l = ias[loup], pts = tracerChemin(cheminNoeuds(l.maison.id, "bergerie"));
+  temoinsNuit(pts, null);
+  G.traces.push({ pts: pts.slice(Math.floor(pts.length * .45)), matiere: "boue", jour: 1 });
+  G.victimes.push({ nom: "un mouton", jour: 0 });
+  noter("annonce", "Jour 1, aube. Un mouton a été égorgé cette nuit à la bergerie, près de la lisière. Des empreintes de loup repartent vers le village.");
+  noter("annonce", "Le Loup se cache parmi les sept villageois. Il ne peut dévorer que quelqu'un qu'il a croisé dans la journée.");
+  toast("Jour 1 — un mouton égorgé à la bergerie. Promène-toi, écoute, interroge.");
+  rendreEnjeu(); rendreJournal();
+}
+
+/* ============================================================ chemins */
+function tracerChemin(noeuds) {   // points intermédiaires tous les ~12 unités, pour la marche et les empreintes
+  const pts = [];
+  for (let k = 0; k < noeuds.length - 1; k++) {
+    const A = NOEUDS[noeuds[k]], B = NOEUDS[noeuds[k + 1]], d = Math.hypot(B.x - A.x, B.y - A.y), n = Math.max(1, Math.round(d / 12));
+    for (let s = 0; s < n; s++) pts.push({ x: A.x + (B.x - A.x) * s / n, y: A.y + (B.y - A.y) * s / n, n: noeuds[k] });
+  }
+  const Z = NOEUDS[noeuds[noeuds.length - 1]]; pts.push({ x: Z.x, y: Z.y, n: noeuds[noeuds.length - 1] });
+  return pts;
+}
+function allerA(c, lieu) {
+  const depart = dans(c.x, c.y) || lieuProche(c.x, c.y);
+  const ns = cheminNoeuds(depart, lieu), L = LIEUX[lieu];
+  const a = rnd() * Math.PI * 2, rr = L.r * (.25 + rnd() * .45);
+  c.chemin = [...ns.slice(1).map(n => ({ x: NOEUDS[n].x + (rnd() - .5) * 30, y: NOEUDS[n].y + (rnd() - .5) * 30 })), { x: L.x + Math.cos(a) * rr, y: L.y + Math.sin(a) * rr * .7 }];
+  c.but = lieu;
+}
+function flaner(c) { const L = LIEUX[c.lieu || "place"], a = rnd() * Math.PI * 2, rr = L.r * (.2 + rnd() * .5); c.chemin = [{ x: L.x + Math.cos(a) * rr, y: L.y + Math.sin(a) * rr * .7 }]; }
+
+/* ============================================================ temps et routines */
+const periode = m => m < 11 * 60 ? "matin" : m < 14 * 60 ? "midi" : "aprem";
+const heure = m => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(Math.floor(m % 60)).padStart(2, "0")}`;
+const heureDite = m => { const h = Math.floor(m / 60), mn = Math.round((m % 60) / 15) * 15; return mn === 60 ? `${h + 1}h` : mn ? `${h}h${mn}` : `${h}h`; };
+const vivantsIA = () => G.ias.filter(c => c.vivant);
+const parNom = n => G.ias.find(c => c.nom === n);
+
+function choisirLieu(c) {
+  const p = c.perso, liste = p[periode(G.minute)];
+  if (rnd() < .18) return pick(Object.keys(LIEUX));
+  let choix = pick(liste);
+  if (choix === "*foule") { const cpt = {}; for (const o of vivantsIA()) if (o !== c && o.lieu) cpt[o.lieu] = (cpt[o.lieu] || 0) + 1; choix = Object.entries(cpt).sort((a, b) => b[1] - a[1])[0]?.[0] || "place"; }
+  else if (choix === "*trace") { const v = G.victimes[G.victimes.length - 1]; const m = v && v.maison ? v.maison.lieu : "grange"; choix = m; }
+  else if (choix === "*ailleurs") { choix = pick(Object.keys(LIEUX).filter(l => l !== c.lieu)); }
+  else if (choix === "*suivre") { const o = pick(vivantsIA().filter(o => o !== c)); choix = o?.but || o?.lieu || "place"; }
+  // le loup cherche à croiser quelqu'un l'après-midi s'il n'a encore repéré personne
+  if (c.loup && periode(G.minute) === "aprem" && !rencontresDuJour(c).length) { const o = pick(vivantsIA().filter(o => o !== c && o.lieu)); if (o) choix = o.lieu; }
+  return choix;
+}
+const rencontresDuJour = (c, jour = G.jour) => c.vu.filter(v => v.jour === jour && parNom(v.qui)?.vivant);
+
+/* ============================================================ mémoire et perception */
+function observer() {
+  const ias = vivantsIA();
+  for (const c of ias) c.lieu = dans(c.x, c.y);
+  for (const a of ias) for (const b of ias) {
+    if (a === b || !a.lieu || a.lieu !== b.lieu) continue;
+    if (!a.vu.some(v => v.jour === G.jour && v.qui === b.nom && v.lieu === a.lieu)) a.vu.push({ jour: G.jour, minute: G.minute, qui: b.nom, lieu: a.lieu });
+  }
+  if (G.phase !== "jour") return;
+  // ce que le juge voit : quelqu'un dans un lieu, dans son champ de vision
+  for (const c of ias) {
+    if (!c.lieu || dist(c, G.moi) > VUE) continue;
+    const k = `${G.jour}|${c.nom}|${c.lieu}`;
+    if (!G.vuParMoi.has(k)) { G.vuParMoi.add(k); noter("vu", `${c.nom} ${LIEUX[c.lieu].a}.`); }
+  }
+}
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const VUE = 430, OUIE = 165;
+
+/* ============================================================ paroles (scriptées à partir des faits) */
+const derniereVictime = () => { const v = G.victimes[G.victimes.length - 1]; return v && v.ia ? v : null; };
+function croiseAvec(c, victime) {   // c a-t-il vu la victime le jour où elle a été repérée ?
+  return c.vu.find(v => v.jour === victime.jour && v.qui === victime.nom);
+}
+function avecVictime(c, victime) {   // qui c a vu dans le même lieu que la victime, ce jour-là
+  const ou = c.vu.filter(v => v.jour === victime.jour && v.qui === victime.nom).map(v => v.lieu);
+  if (croiseAvec(c, victime) === undefined) return [];
+  return [...new Set(c.vu.filter(v => v.jour === victime.jour && ou.includes(v.lieu) && v.qui !== victime.nom).map(v => v.qui))];
+}
+function repondre(c, q) {
+  const V = derniereVictime(), oublie = !c.loup && rnd() < .2;
+  switch (q) {
+    case "matin": {
+      const hier = G.minute < 11 * 60;
+      const etais = c.vu.filter(v => v.jour === G.jour).map(v => v.lieu)[0] || c.lieu;
+      return etais ? `${hier ? "Depuis l'aube" : "Ce matin"}, j'étais ${LIEUX[etais].a}.` : "Je marchais, je n'ai pas fait attention.";
+    }
+    case "vus": {
+      const vs = c.vu.filter(v => v.jour === G.jour && v.minute > JOUR_DEBUT + 40).slice(-4).reverse().slice(0, 3);
+      if (!vs.length) return "Personne, je viens d'arriver.";
+      return "J'ai vu " + vs.map(v => `${v.qui} ${LIEUX[v.lieu].a} vers ${heureDite(v.minute)}`).join(", ") + ".";
+    }
+    case "croise": {
+      if (!V) return "Personne n'est mort, Dieu merci.";
+      if (c.loup) { c.mensonges++; return `Non, je n'ai pas vu ${V.nom} de la journée.`; }
+      if (oublie) return "Je ne sais plus… La journée a été longue.";
+      const v = croiseAvec(c, V);
+      return v ? `Oui, ${LIEUX[v.lieu].a}, vers ${heureDite(v.minute)}.` : "Non, on ne s'est pas croisés.";
+    }
+    case "avec": {
+      if (!V) return "De qui tu parles ?";
+      if (c.loup) { const autres = avecVictime(c, V).filter(n => n !== c.nom); c.mensonges++; return autres.length ? `${autres[0]} était avec ${V.nom}, je l'ai vu de loin.` : "Je ne sais pas, je n'étais pas là."; }
+      if (oublie) return "Je n'ai pas fait attention, pardon.";
+      const autres = avecVictime(c, V);
+      if (!croiseAvec(c, V)) return `Je n'ai pas vu ${V.nom} ce jour-là.`;
+      return autres.length ? `Quand j'ai vu ${V.nom}, il y avait aussi ${autres.join(", ")}.` : `${V.nom} n'était avec personne quand je l'ai vu.`;
+    }
+    case "nuit": {
+      const n = c.nuits.find(x => x.jour === G.jour);
+      if (c.loup) return rnd() < .5 ? "Rien, je dormais comme une souche." : `J'ai cru entendre des pas vers ${LIEUX[pick(Object.keys(LIEUX))].nom}.`;
+      return n ? `J'ai entendu des pas près ${LIEUX[n.pres].de}, en pleine nuit.` : "Rien. Je dormais.";
+    }
+    case "soupcon": { const s = soupcon(c); return s.cible ? `${s.cible}. ${s.raison}` : s.raison; }
+  }
+}
+function soupcon(c) {
+  const V = derniereVictime() || G.victimes[G.victimes.length - 1];
+  if (V && V.ia) {
+    let cand = avecVictime(c, V).filter(n => n !== c.nom && parNom(n)?.vivant);
+    if (c.loup) cand = cand.filter(n => !parNom(n).loup);
+    if (cand.length) { const s = pick(cand); return { cible: s, raison: `${accord(s, "Il", "Elle")} était avec ${V.nom} la veille de sa mort.` }; }
+  }
+  const n = c.nuits.find(x => x.jour === G.jour);
+  if (n) {
+    const pres = vivantsIA().filter(o => o !== c && o.maison.lieu === n.pres && !(c.loup && o.loup));
+    if (pres.length) { const s = pick(pres); return { cible: s.nom, raison: `J'ai entendu des pas près ${LIEUX[n.pres].de} cette nuit, et sa maison est par là.` }; }
+  }
+  const s = pick(vivantsIA().filter(o => o !== c && !(c.loup && o.loup)));
+  return s ? { cible: s.nom, raison: "Rien de solide, une impression." } : { cible: null, raison: "Je n'ai personne en tête." };
+}
+const REACTIONS = ["Ah bon ?", "Tu es sûr de toi ?", "Je n'avais pas remarqué.", "Hm. Je garde ça en tête.", "Tais-toi, tu me fais peur.", "Ça ne prouve rien.", "Intéressant…"];
+function conversation(a, b) {
+  const V = derniereVictime(), L = [];
+  const dire = (c, t) => L.push([c, t]);
+  const r = rnd();
+  if (V && r < .45) {
+    dire(a, phrase(a.perso.dit, `tu as croisé ${V.nom}, la veille de sa mort ?`));
+    dire(b, repondre(b, "croise"));
+    const av = avecVictime(a, V).filter(n => n !== a.nom && n !== b.nom);
+    if (av.length && !a.loup) dire(a, `Moi j'ai vu ${V.nom} avec ${av.join(" et ")}.`);
+    else dire(a, pick(REACTIONS));
+  } else if (r < .7) {
+    const obs = a.vu.filter(x => x.jour === G.jour && x.qui !== b.nom && x.minute > JOUR_DEBUT + 40), hors = obs.filter(x => x.lieu !== "place");
+    const v = pick(hors.length && rnd() < .8 ? hors : obs);
+    if (!v) return null;
+    dire(a, phrase(a.perso.dit, `j'ai vu ${v.qui} ${LIEUX[v.lieu].a} vers ${heureDite(v.minute)}.`));
+    dire(b, pick(REACTIONS));
+  } else if (r < .85 && a.nuits.some(n => n.jour === G.jour)) {
+    dire(a, repondre(a, "nuit")); dire(b, pick(REACTIONS));
+  } else {
+    const s = soupcon(a);
+    if (!s.cible || s.cible === b.nom) return null;
+    dire(a, `Je me méfie de ${s.cible}. ${s.raison}`);
+    dire(b, pick(["Moi aussi, un peu.", "Tu vas trop vite.", "Je n'en suis pas sûr.", "Il faudra le dire au conseil."]));
+  }
+  return L;
+}
+
+/* ============================================================ nuit */
+function temoinsNuit(pts, victime) {
+  for (const c of G.ias) {
+    if (!c.vivant || c.loup || c === victime) continue;
+    const pres = pts.find(p => dist(p, c.maison) < 175);
+    if (pres && rnd() < c.perso.oreille + .25) c.nuits.push({ jour: G.jour, pres: dans(pres.x, pres.y) || lieuProche(pres.x, pres.y) });
+  }
+}
+function commencerNuit() {
+  G.phase = "nuit"; G.dialogueAvec = null; fermerDialogue();
+  const loup = G.ias.find(c => c.loup);
+  const reperes = rencontresDuJour(loup).map(v => parNom(v.qui)).filter(c => c && c.vivant && !c.loup);
+  const victime = pick(reperes.length ? reperes : vivantsIA().filter(c => !c.loup));
+  const ns = cheminNoeuds(loup.maison.id, victime.maison.id), pts = tracerChemin(ns);
+  const avant = [...ns].reverse().find(n => LIEUX[n] && n !== victime.maison.lieu) || victime.maison.lieu;
+  G.nuit = { t: 0, duree: 30, victime, pts, matiere: LIEUX[avant].trace, aboie: new Set(), vuParFenetre: false };
+  for (const c of G.ias) { c.chemin = []; c.parle = null; if (c.vivant) { c.x = c.maison.x; c.y = c.maison.y + 26; } }
+  G.moi.chemin = []; G.moi.x = G.moi.maison.x; G.moi.y = G.moi.maison.y + 26;
+  noter("nuit", `La nuit tombe. Tu rentres chez toi. Ta fenêtre donne sur ${LIEUX[G.moi.maison.fenetre].nom}.`);
+  toast(`Nuit ${G.jour}. Ta fenêtre donne sur ${LIEUX[G.moi.maison.fenetre].nom}. Regarde bien.`);
+}
+function avancerNuit(dt) {
+  const N = G.nuit; N.t += dt;
+  const f = (N.t / N.duree - .25) / .5;   // le loup marche entre 25 % et 75 % de la nuit
+  if (f > 0 && f < 1) {
+    const p = N.pts[Math.min(N.pts.length - 1, Math.floor(f * N.pts.length))];
+    G.loupMarche = p;
+    for (const m of MAISONS) if (!N.aboie.has(m.q) && dist(p, m) < 120) { N.aboie.add(m.q); toast(`Un chien aboie dans le quartier ${m.q}.`); noter("nuit", `Un chien aboie dans le quartier ${m.q}.`); }
+    const F = LIEUX[G.moi.maison.fenetre];
+    if (!N.vuParFenetre && Math.hypot(p.x - F.x, p.y - F.y) < 170) { N.vuParFenetre = true; noter("nuit", `Par ta fenêtre : une silhouette traverse ${F.nom}.`); toast(`Une silhouette traverse ${F.nom}…`); }
+  } else G.loupMarche = null;
+  if (N.t >= N.duree) aube();
+}
+function aube() {
+  const N = G.nuit, v = N.victime;
+  G.jour++; v.vivant = false;
+  G.victimes.push({ nom: v.nom, ia: true, jour: G.jour - 1, maison: v.maison });
+  G.morts.push(v);
+  temoinsNuit(N.pts, v);
+  G.traces = [{ pts: N.pts.slice(Math.floor(N.pts.length * .55)), matiere: N.matiere, jour: G.jour }];
+  G.nuit = null; G.loupMarche = null; G.phase = "jour"; G.minute = JOUR_DEBUT;
+  for (const [k, c] of vivantsIA().entries()) { const a = (k / 7) * Math.PI * 2; c.x = LIEUX.place.x + Math.cos(a) * 75; c.y = LIEUX.place.y + Math.sin(a) * 55; c.chemin = []; c.prochain = 1 + rnd() * 4; }
+  G.moi.x = LIEUX.place.x; G.moi.y = LIEUX.place.y + 70;
+  noter("annonce", `Jour ${G.jour}, aube. ${v.nom} a été ${accord(v.nom, "dévoré", "dévorée")} cette nuit (${accord(v.nom, "Villageois", "Villageoise")}). Des traces de ${N.matiere} sur son seuil : ${lieuDeTrace(N.matiere)} laisse cette marque.`);
+  toast(`Jour ${G.jour} — ${v.nom} a été ${accord(v.nom, "dévoré", "dévorée")}. Traces de ${N.matiere} sur son seuil.`);
+  if (vivantsIA().filter(c => !c.loup).length <= 2) return finir(false, "Il ne reste presque plus personne : le Loup a gagné.");
+  rendreEnjeu();
+}
+const lieuDeTrace = m => Object.values(LIEUX).find(L => L.trace === m).nom;
+
+/* ============================================================ conseil */
+function conseil() {
+  G.phase = "conseil"; fermerDialogue();
+  const p = document.getElementById("panneau"); p.replaceChildren();
+  p.append(el("h2", null, `Conseil du soir · jour ${G.jour}`));
+  p.append(el("p", null, "Tout le village est réuni autour du feu. Chacun dit qui il soupçonne."));
+  const avis = el("div", "avis");
+  for (const c of vivantsIA()) { const d = el("div"); const pa = el("span", "pastille", c.nom[0]); pa.style.background = c.couleur; const s = soupcon(c); d.append(pa, el("span", null, `${c.nom} : « ${s.cible ? `Je soupçonne ${s.cible}. ${s.raison}` : s.raison} »`)); avis.append(d); }
+  p.append(avis);
+  p.append(el("p", null, "Qui élimines-tu ?"));
+  const ch = el("div", "choix");
+  for (const c of vivantsIA()) { const b = el("button", "btn", c.nom); b.type = "button"; b.onclick = () => eliminer(c); ch.append(b); }
+  const passer = el("button", "btn", "Ne désigner personne"); passer.type = "button"; passer.onclick = () => { noter("annonce", "Tu ne désignes personne ce soir."); fermerVoile(); commencerNuit(); };
+  ch.append(passer); p.append(ch);
+  document.getElementById("voile").hidden = false;
+}
+function eliminer(c) {
+  c.vivant = false; G.morts.push(c);
+  if (c.loup) return finir(true, `${c.nom} était le Loup-Garou. Le hameau peut dormir.`);
+  G.chances--;
+  noter("annonce", `Tu as éliminé ${c.nom}. ${accord(c.nom, "Il était Villageois", "Elle était Villageoise")} (${c.perso.label}).`);
+  rendreEnjeu();
+  if (G.chances <= 0 || vivantsIA().filter(o => !o.loup).length <= 2) return finir(false, `${c.nom} était ${accord(c.nom, "innocent", "innocente")}. Le Loup a gagné.`);
+  const p = document.getElementById("panneau"); p.replaceChildren(el("h2", null, `${c.nom} était ${accord(c.nom, "Villageois", "Villageoise")}`), el("p", null, `Il te reste ${G.chances} erreur${G.chances > 1 ? "s" : ""} possible${G.chances > 1 ? "s" : ""}. La nuit tombe.`));
+  const b = el("button", "btn fort", "Passer la nuit"); b.type = "button"; b.onclick = () => { fermerVoile(); commencerNuit(); }; p.append(b);
+}
+function finir(victoire, texte) {
+  G.phase = "fin"; G.fin = victoire;
+  const loup = G.ias.find(c => c.loup), p = document.getElementById("panneau"); p.replaceChildren();
+  p.append(el("h2", null, victoire ? "Victoire du village" : "Victoire du Loup"), el("p", null, texte));
+  p.append(el("p", null, `Le Loup était ${loup.nom} (${loup.perso.label}). Il a menti ${loup.mensonges} fois quand on l'interrogeait sur ses rencontres. Victimes : ${G.victimes.map(v => v.nom).join(", ")}.`));
+  const avis = el("div", "avis");
+  for (const c of G.ias) { const d = el("div"); const pa = el("span", "pastille", c.nom[0]); pa.style.background = c.couleur; d.append(pa, el("span", null, `${c.nom} : ${c.loup ? "Loup-Garou" : accord(c.nom, "Villageois", "Villageoise")} · ${c.perso.label}${c.vivant ? "" : " · mort"}`)); avis.append(d); }
+  p.append(avis);
+  p.append(el("p", null, "C'est un prototype de sensation : les villageois sont scriptés. Dis-moi si tu as eu envie de jouer, ce qui manquait, ce qui était de trop."));
+  const b = el("button", "btn fort", "Rejouer"); b.type = "button"; b.onclick = () => { fermerVoile(); nouvellePartie(); }; p.append(b);
+  document.getElementById("voile").hidden = false;
+}
+const fermerVoile = () => { document.getElementById("voile").hidden = true; };
+
+/* ============================================================ dialogue avec le juge */
+const QUESTIONS = [["matin", "Où étais-tu ce matin ?"], ["vus", "Qui as-tu vu aujourd'hui ?"], ["croise", "As-tu croisé la dernière victime ?"], ["avec", "Qui était avec la victime ?"], ["nuit", "As-tu entendu quelque chose cette nuit ?"], ["soupcon", "Qui soupçonnes-tu ?"]];
+function ouvrirDialogue(c) {
+  G.dialogueAvec = c; G.lent = true; c.chemin = []; if (c.parle) c.parle = null;
+  const d = document.getElementById("dialogue"); d.replaceChildren();
+  const tete = el("div", "tete"); const pa = el("span", "pastille", c.nom[0]); pa.style.background = c.couleur;
+  const fermer = el("button", "btn", "Partir"); fermer.type = "button"; fermer.onclick = fermerDialogue;
+  tete.append(pa, el("b", null, c.nom), el("span", null, c.perso.label), fermer);
+  const rep = el("div", "rep", `${c.perso.dit ? c.perso.dit.replace(/:$/, "") + "…" : "…"} Tu veux quoi ?`);
+  const qs = el("div", "questions");
+  const V = derniereVictime();
+  for (const [k, t] of QUESTIONS) {
+    if ((k === "croise" || k === "avec") && !V) continue;
+    const b = el("button", null, k === "croise" ? `As-tu croisé ${V.nom} la veille de sa mort ?` : k === "avec" ? `Qui était avec ${V.nom} ce jour-là ?` : t); b.type = "button";
+    b.onclick = () => { const r = repondre(c, k); rep.textContent = r; c.bulle = { texte: r, fin: perf() + 5000 }; noter("reponse", `${c.nom} (à toi) : « ${r} »`, c); verifierContradiction(c, k, r); };
+    qs.append(b);
+  }
+  d.append(tete, rep, qs, el("div", "lent", "Le temps ralentit pendant que vous parlez."));
+  d.hidden = false;
+}
+function fermerDialogue() { G && (G.dialogueAvec = null, G.lent = false); document.getElementById("dialogue").hidden = true; }
+function verifierContradiction(c, k, r) {   // le carnet relève quand une réponse contredit ce que tu as toi-même vu
+  const V = derniereVictime(); if (!V || k !== "croise" || !r.startsWith("Non")) return;
+  const lieux = nom => new Set([...G.vuParMoi].filter(x => x.startsWith(`${V.jour}|${nom}|`)).map(x => x.split("|")[2]));
+  const lc = lieux(c.nom), commun = [...lieux(V.nom)].filter(l => lc.has(l));
+  if (commun.length) noter("contradiction", `${c.nom} dit ne pas avoir croisé ${V.nom}… mais tu les as vus tous les deux à ${LIEUX[commun[0]].nom} ce jour-là.`);
+}
+
+/* ============================================================ boucle */
+const perf = () => performance.now();
+let derniere = perf(), cumulObs = 0;
+function boucle() {
+  const t = perf(); let dt = Math.min(.1, (t - derniere) / 1000); derniere = t;
+  if (G && !G.pause && G.phase !== "conseil" && G.phase !== "fin") {
+    dt *= G.vitesse * (G.lent ? .15 : 1);
+    if (G.phase === "nuit") avancerNuit(dt);
+    else majJour(dt);
+  }
+  G && dessiner(t);
+  requestAnimationFrame(boucle);
+}
+function majJour(dt) {
+  G.minute += dt * VITESSE_JOUR;
+  // déplacement du juge (clavier ou clic)
+  const m = G.moi, v = 150 * dt;
+  let kx = (touches.has("ArrowRight") || touches.has("d") ? 1 : 0) - (touches.has("ArrowLeft") || touches.has("q") || touches.has("a") ? 1 : 0);
+  let ky = (touches.has("ArrowDown") || touches.has("s") ? 1 : 0) - (touches.has("ArrowUp") || touches.has("z") || touches.has("w") ? 1 : 0);
+  if (kx || ky) { const n = Math.hypot(kx, ky); m.x += kx / n * v; m.y += ky / n * v; m.chemin = []; m.versIA = null; if (G.dialogueAvec && dist(m, G.dialogueAvec) > 120) fermerDialogue(); }
+  else marcher(m, v);
+  m.x = Math.max(20, Math.min(W - 20, m.x)); m.y = Math.max(20, Math.min(H - 20, m.y));
+  if (m.versIA && dist(m, m.versIA) < 70 && m.versIA.vivant) { const c = m.versIA; m.versIA = null; m.chemin = []; ouvrirDialogue(c); }
+  // villageois
+  for (const c of vivantsIA()) {
+    if (c === G.dialogueAvec) continue;
+    if (c.parle) {
+      if (c.chemin.length) marcher(c, 60 * dt);
+      if (c.perso.fuit && dist(c, m) < 120 && c.parle.qui === c) { c.parle.lignes = c.parle.lignes.slice(0, c.parle.k + 1); c.bulle = { texte: "… On en reparlera.", fin: perf() + 2500 }; c.cooldown = 10; finirConv(c.parle); allerA(c, pick(Object.keys(LIEUX).filter(l => l !== c.lieu))); continue; }
+      continue;
+    }
+    if (c.chemin.length) { marcher(c, 82 * dt); continue; }
+    c.prochain -= dt;
+    if (c.prochain <= 0) {
+      if (G.minute >= CLOCHE) { if (c.but !== "place" || dist(c, LIEUX.place) > 120) allerA(c, "place"); c.prochain = 3; }
+      else if (rnd() < .45) { allerA(c, choisirLieu(c)); c.prochain = 8 + rnd() * 10; }
+      else { flaner(c); c.prochain = 3 + rnd() * 6; }
+    }
+    c.cooldown = Math.max(0, c.cooldown - dt);
+  }
+  // conversations entre villageois
+  for (const conv of G.convs || []) avancerConv(conv, dt);
+  G.convs = (G.convs || []).filter(cv => !cv.fini);
+  cumulObs += dt;
+  if (cumulObs > .4) {
+    cumulObs = 0; observer();
+    if (G.minute < CLOCHE) lancerConversations();
+  }
+  if (G.minute >= CLOCHE && !G.cloche) { G.cloche = true; toast("La cloche sonne : <em>conseil du soir</em> sur la Place."); noter("annonce", "La cloche sonne. Tout le monde se dirige vers la Place."); }
+  if (G.minute >= CONSEIL) { G.cloche = false; for (const cv of G.convs || []) finirConv(cv); conseil(); }
+}
+function marcher(c, v) {
+  while (c.chemin.length && v > 0) {
+    const p = c.chemin[0], d = Math.hypot(p.x - c.x, p.y - c.y);
+    if (d <= v) { c.x = p.x; c.y = p.y; c.chemin.shift(); v -= d; } else { c.x += (p.x - c.x) / d * v; c.y += (p.y - c.y) / d * v; c.dir = Math.atan2(p.y - c.y, p.x - c.x); v = 0; }
+  }
+  c.marche = c.chemin.length > 0;
+}
+function lancerConversations() {
+  const libres = vivantsIA().filter(c => c.lieu && !c.parle && !c.chemin.length && c.cooldown <= 0 && c !== G.dialogueAvec);
+  for (const a of libres) {
+    if (a.parle || rnd() > .12) continue;
+    const b = libres.find(o => o !== a && !o.parle && o.lieu === a.lieu && dist(o, a) < 110);
+    if (!b) continue;
+    const lignes = conversation(a, b); if (!lignes) { a.cooldown = 6; continue; }
+    const cv = { a, b, qui: a, lignes, k: -1, t: 0, lieu: a.lieu };
+    a.parle = cv; b.parle = cv; (G.convs ||= []).push(cv);
+    // se tourner l'un vers l'autre et se rapprocher
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    a.chemin = [{ x: mx - 16, y: my }]; b.chemin = [{ x: mx + 16, y: my }];
+  }
+}
+function avancerConv(cv, dt) {
+  cv.t -= dt;
+  if (cv.t > 0) return;
+  cv.k++;
+  if (cv.k >= cv.lignes.length) return finirConv(cv);
+  const [c, texte] = cv.lignes[cv.k];
+  c.bulle = { texte, fin: perf() + 3600 / G.vitesse };
+  cv.t = 3.4;
+  if (dist(c, G.moi) < OUIE) noter("entendu", `${c.nom} à ${(c === cv.a ? cv.b : cv.a).nom} (${LIEUX[cv.lieu].court}) : « ${texte} »`, c);
+}
+function finirConv(cv) { cv.fini = true; for (const c of [cv.a, cv.b]) { if (c.parle === cv) c.parle = null; c.cooldown = 12 + rnd() * 10; c.prochain = 1 + rnd() * 3; } }
+
+/* ============================================================ rendu */
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+const lum = document.createElement("canvas");
+let fond = null, cam = { x: 800, y: 540, z: 1 }, vw = 0, vh = 0, dpr = 1;
+const arbres = [];
+function genererFond() {
+  // arbres : lisière dense à gauche + bosquets, loin des chemins et bâtiments
+  arbres.length = 0;
+  const libre = (x, y) => {
+    if (Object.values(LIEUX).some(L => Math.hypot(L.x - x, L.y - y) < L.r + 40)) return false;
+    if (MAISONS.some(m => Math.hypot(m.x - x, m.y - y) < 70)) return false;
+    for (const [a, b] of [...CHEMINS, ...MAISONS.map(m => [m.id, m.lieu]), ["bergerie", "grange"]]) { const A = NOEUDS[a], B = NOEUDS[b]; if (distSeg(x, y, A, B) < 45) return false; }
+    if (RIVIERE.some((p, i) => i && distSeg(x, y, { x: RIVIERE[i - 1][0], y: RIVIERE[i - 1][1] }, { x: p[0], y: p[1] }) < 55)) return false;
+    return Math.hypot(BERGERIE.x - x, BERGERIE.y - y) > 80;
+  };
+  for (let k = 0; k < 900 && arbres.length < 170; k++) {
+    const lis = k % 3 === 0, x = lis ? rnd() * 110 : rnd() * W, y = rnd() * H;
+    if (libre(x, y)) arbres.push({ x, y, r: 16 + rnd() * 16, t: rnd() * 6 });
+  }
+  fond = document.createElement("canvas"); const S = 1.5; fond.width = W * S; fond.height = H * S;
+  const g = fond.getContext("2d"); g.scale(S, S);
+  g.fillStyle = "#6f8f4e"; g.fillRect(0, 0, W, H);
+  for (let k = 0; k < 700; k++) { g.fillStyle = rnd() < .5 ? "rgba(40,70,30,.10)" : "rgba(170,190,110,.10)"; g.beginPath(); g.ellipse(rnd() * W, rnd() * H, 20 + rnd() * 60, 10 + rnd() * 30, rnd() * 3, 0, 7); g.fill(); }
+  // lisière plus sombre
+  const gr = g.createLinearGradient(0, 0, 170, 0); gr.addColorStop(0, "rgba(20,40,20,.55)"); gr.addColorStop(1, "rgba(20,40,20,0)"); g.fillStyle = gr; g.fillRect(0, 0, 170, H);
+  // rivière
+  g.lineCap = "round"; g.lineJoin = "round";
+  courbe(g, RIVIERE); g.strokeStyle = "#8a7d58"; g.lineWidth = 78; g.stroke();
+  courbe(g, RIVIERE); g.strokeStyle = "#3f7193"; g.lineWidth = 62; g.stroke();
+  courbe(g, RIVIERE); g.strokeStyle = "#4f86a8"; g.lineWidth = 40; g.stroke();
+  // chemins
+  const seg = [...CHEMINS, ...MAISONS.map(m => [m.id, m.lieu]), ["bergerie", "grange"]];
+  for (const [w, c] of [[38, "#9c8459"], [28, "#b9a172"], [10, "#c8b285"]]) { g.strokeStyle = c; g.lineWidth = w; for (const [a, b] of seg) { const A = NOEUDS[a], B = NOEUDS[b]; g.beginPath(); g.moveTo(A.x, A.y); g.quadraticCurveTo((A.x + B.x) / 2 + (A.y - B.y) * .06, (A.y + B.y) / 2 + (B.x - A.x) * .06, B.x, B.y); g.stroke(); } }
+  // sols des lieux
+  for (const [id, L] of Object.entries(LIEUX)) { g.fillStyle = id === "place" ? "#b8ab90" : "#ab9a72"; g.beginPath(); g.ellipse(L.x, L.y, L.r, L.r * .75, 0, 0, 7); g.fill(); if (id === "place") { g.strokeStyle = "rgba(90,80,60,.35)"; g.lineWidth = 1; for (let k = 0; k < 140; k++) { const a = rnd() * 7, rr = rnd() * L.r * .95; g.strokeRect(L.x + Math.cos(a) * rr - 5, L.y + Math.sin(a) * rr * .75 - 3, 10, 6); } } }
+  // bâtiments
+  batiment(g, 800, 175, 170, 80, "#9c4a32", "#7a3524");                // taverne
+  g.fillStyle = "#5e3b1f"; g.fillRect(880, 215, 18, 12);
+  batiment(g, 1205, 205, 120, 74, "#5d6470", "#454b55");               // forge
+  g.fillStyle = "#3a3e45"; g.fillRect(1240, 180, 18, 18);
+  batiment(g, 405, 175, 82, 140, "#6f7c8e", "#566273", true);          // chapelle
+  g.fillStyle = "#566273"; g.fillRect(392, 92, 26, 26);
+  g.strokeStyle = "#e8e2d0"; g.lineWidth = 3; g.beginPath(); g.moveTo(405, 96); g.lineTo(405, 114); g.moveTo(398, 102); g.lineTo(412, 102); g.stroke();
+  batiment(g, 345, 520, 170, 104, "#8b3a2b", "#6e2c20");               // grange
+  g.strokeStyle = "rgba(255,240,220,.5)"; g.lineWidth = 2; g.strokeRect(325, 560, 40, 22); g.beginPath(); g.moveTo(325, 560); g.lineTo(365, 582); g.moveTo(365, 560); g.lineTo(325, 582); g.stroke();
+  batiment(g, 1265, 610, 86, 86, "#a39a86", "#857c69");                // moulin
+  // lavoir : bassin
+  g.fillStyle = "#8d8a80"; g.fillRect(745, 845, 150, 64); g.fillStyle = "#4f86a8"; g.fillRect(755, 853, 130, 48);
+  for (const [x, y] of [[745, 845], [887, 845], [745, 901], [887, 901]]) { g.fillStyle = "#5a4636"; g.fillRect(x - 2, y - 2, 10, 10); }
+  // place : puits et bancs
+  g.fillStyle = "#7d7465"; g.beginPath(); g.arc(860, 510, 20, 0, 7); g.fill(); g.fillStyle = "#28333d"; g.beginPath(); g.arc(860, 510, 12, 0, 7); g.fill();
+  g.fillStyle = "#6b4a2b"; g.fillRect(700, 500, 40, 8); g.fillRect(705, 585, 40, 8);
+  // maisons
+  for (const m of MAISONS) batiment(g, m.x, m.y - 6, 64, 50, m.q === "Est" ? "#8a5a3a" : "#7a6248", m.q === "Est" ? "#6d4529" : "#5f4a34");
+  // bergerie
+  g.strokeStyle = "#6b4a2b"; g.lineWidth = 3; g.strokeRect(BERGERIE.x - 50, BERGERIE.y - 35, 100, 70);
+  for (let k = 0; k < 6; k++) { g.fillStyle = "#efe9dc"; g.beginPath(); g.ellipse(BERGERIE.x - 30 + (k % 3) * 28, BERGERIE.y - 12 + Math.floor(k / 3) * 26, 9, 7, 0, 0, 7); g.fill(); }
+  // noms des lieux, gravés au sol
+  g.font = "600 17px 'IM Fell English SC', Georgia, serif"; g.textAlign = "center"; g.fillStyle = "rgba(40,30,18,.75)";
+  for (const L of Object.values(LIEUX)) g.fillText(L.court, L.x, L.y + L.r * .75 - 8);
+  g.fillText("Bergerie", BERGERIE.x, BERGERIE.y + 56);
+  g.save(); g.translate(40, 560); g.rotate(-Math.PI / 2); g.fillStyle = "rgba(230,230,210,.55)"; g.fillText("Lisière", 0, 0); g.restore();
+}
+function batiment(g, x, y, w, h, toit, toit2, vertical) {
+  g.fillStyle = "rgba(0,0,0,.25)"; g.fillRect(x - w / 2 + 8, y - h / 2 + 10, w, h);
+  g.fillStyle = toit; g.fillRect(x - w / 2, y - h / 2, w, h);
+  g.fillStyle = toit2; if (vertical) g.fillRect(x, y - h / 2, w / 2, h); else g.fillRect(x - w / 2, y, w, h / 2);
+  g.strokeStyle = "rgba(0,0,0,.25)"; g.lineWidth = 1.5; g.strokeRect(x - w / 2, y - h / 2, w, h);
+  g.strokeStyle = "rgba(255,255,255,.12)"; g.lineWidth = 1; for (let k = 1; k < 6; k++) { g.beginPath(); if (vertical) { g.moveTo(x - w / 2, y - h / 2 + k * h / 6); g.lineTo(x + w / 2, y - h / 2 + k * h / 6); } else { g.moveTo(x - w / 2 + k * w / 6, y - h / 2); g.lineTo(x - w / 2 + k * w / 6, y + h / 2); } g.stroke(); }
+}
+function courbe(g, pts) { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length - 1; i++) { const mx = (pts[i][0] + pts[i + 1][0]) / 2, my = (pts[i][1] + pts[i + 1][1]) / 2; g.quadraticCurveTo(pts[i][0], pts[i][1], mx, my); } const z = pts[pts.length - 1]; g.lineTo(z[0], z[1]); }
+function distSeg(x, y, A, B) { const dx = B.x - A.x, dy = B.y - A.y, l = dx * dx + dy * dy || 1; let t = ((x - A.x) * dx + (y - A.y) * dy) / l; t = Math.max(0, Math.min(1, t)); return Math.hypot(x - (A.x + t * dx), y - (A.y + t * dy)); }
+
+function redimensionner() {
+  const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1);
+  vw = r.width; vh = r.height; cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+  cam.z = Math.max(.55, Math.min(1.25, Math.min(vw / 900, vh / 640)));
+}
+new ResizeObserver(redimensionner).observe(cv);
+
+function obscurite() {   // 0 = plein jour, ~0.85 = nuit noire
+  if (G.phase === "nuit") return .84;
+  const m = G.minute;
+  if (m < JOUR_DEBUT + 25) return .5 * (1 - (m - JOUR_DEBUT) / 25);
+  if (m > 17 * 60) return Math.min(.6, (m - 17 * 60) / 110 * .6);
+  return 0;
+}
+function dessiner(t) {
+  if (!fond || !vw) return;
+  const nuit = G.phase === "nuit";
+  // caméra : suit le juge ; la nuit, sa maison et sa fenêtre
+  const F = LIEUX[G.moi.maison.fenetre];
+  const cx = nuit ? (G.moi.maison.x + F.x) / 2 : G.moi.x, cy = nuit ? (G.moi.maison.y + F.y) / 2 : G.moi.y;
+  cam.x += (cx - cam.x) * .08; cam.y += (cy - cam.y) * .08;
+  const z = cam.z, hw = vw / 2 / z, hh = vh / 2 / z;
+  cam.x = Math.max(hw, Math.min(W - hw, cam.x)); cam.y = Math.max(hh, Math.min(H - hh, cam.y));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, vw, vh);
+  ctx.save(); ctx.translate(vw / 2, vh / 2); ctx.scale(z, z); ctx.translate(-cam.x, -cam.y);
+  ctx.drawImage(fond, 0, 0, W, H);
+  // reflets de la rivière
+  ctx.strokeStyle = "rgba(220,240,255,.35)"; ctx.lineWidth = 2;
+  for (let i = 1; i < RIVIERE.length; i++) { const [x1, y1] = RIVIERE[i - 1], [x2, y2] = RIVIERE[i]; for (let k = 0; k < 4; k++) { const f = ((t / 4000 + k / 4 + i * .13) % 1); const x = x1 + (x2 - x1) * f, y = y1 + (y2 - y1) * f; ctx.beginPath(); ctx.moveTo(x - 8, y + Math.sin(t / 500 + k) * 4); ctx.lineTo(x + 8, y + Math.sin(t / 500 + k) * 4); ctx.stroke(); } }
+  // moulin : ailes
+  ctx.save(); ctx.translate(1265, 610); ctx.rotate(t / 1600); ctx.fillStyle = "#e9e1cc"; ctx.strokeStyle = "#6b5a40"; ctx.lineWidth = 2;
+  for (let k = 0; k < 4; k++) { ctx.rotate(Math.PI / 2); ctx.fillRect(4, -6, 64, 12); ctx.strokeRect(4, -6, 64, 12); } ctx.fillStyle = "#6b5a40"; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 7); ctx.fill(); ctx.restore();
+  // feu de la place et braises de la forge
+  feu(ctx, 800, 540, t, 1); feu(ctx, 1170, 230, t, .45);
+  fumee(ctx, 1249, 180, t);
+  // arbres (ombre + couronne, léger balancement)
+  for (const a of arbres) { ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(a.x + 6, a.y + 8, a.r, a.r * .8, 0, 0, 7); ctx.fill(); }
+  for (const a of arbres) { const s = Math.sin(t / 1400 + a.t) * 1.5; ctx.fillStyle = "#3f6b35"; ctx.beginPath(); ctx.arc(a.x + s, a.y, a.r, 0, 7); ctx.fill(); ctx.fillStyle = "#4f7d40"; ctx.beginPath(); ctx.arc(a.x + s - a.r * .25, a.y - a.r * .25, a.r * .6, 0, 7); ctx.fill(); }
+  // empreintes
+  for (const tr of G.traces) {
+    ctx.fillStyle = tr.matiere === "farine" ? "rgba(250,248,240,.85)" : tr.matiere === "suie" ? "rgba(25,25,28,.8)" : tr.matiere === "eau" ? "rgba(70,110,140,.75)" : tr.matiere === "paille" ? "rgba(225,190,90,.85)" : tr.matiere === "cire" ? "rgba(245,235,200,.85)" : tr.matiere === "bière" ? "rgba(160,110,40,.8)" : "rgba(70,50,30,.8)";
+    tr.pts.forEach((p, k) => { if (k % 2) return; const o = (k % 4 ? 5 : -5); ctx.beginPath(); ctx.ellipse(p.x + o, p.y + o * .4, 3.5, 2.4, 0, 0, 7); ctx.fill(); });
+  }
+  // personnages
+  const persos = [...vivantsIA(), G.moi].sort((a, b) => a.y - b.y);
+  for (const c of persos) {
+    if (!c.humain && !nuit && dist(c, G.moi) > VUE) continue;
+    if (nuit) continue;
+    bonhomme(ctx, c, t);
+  }
+  // le loup, la nuit, seulement s'il passe dans ce que tu vois par ta fenêtre
+  if (nuit && G.loupMarche && Math.hypot(G.loupMarche.x - F.x, G.loupMarche.y - F.y) < 190) {
+    const p = G.loupMarche; ctx.fillStyle = "rgba(5,5,10,.9)"; ctx.beginPath(); ctx.ellipse(p.x, p.y, 13, 9, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(p.x, p.y - 12, 7, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+  // lumière : obscurité, lanterne, fenêtres
+  const a = obscurite(), ecran = (x, y) => [(x - cam.x) * z + vw / 2, (y - cam.y) * z + vh / 2];
+  if (a > 0) {
+    // l'obscurité se dessine sur un calque à part : on y perce la lanterne et le feu, puis on le pose sur le village
+    if (lum.width !== cv.width || lum.height !== cv.height) { lum.width = cv.width; lum.height = cv.height; }
+    const L = lum.getContext("2d"); L.setTransform(dpr, 0, 0, dpr, 0, 0); L.globalCompositeOperation = "source-over";
+    L.clearRect(0, 0, vw, vh); L.fillStyle = `rgba(8,12,30,${a})`; L.fillRect(0, 0, vw, vh);
+    L.globalCompositeOperation = "destination-out";
+    const trou = (x, y, r, f) => { const [sx, sy] = ecran(x, y); const gr = L.createRadialGradient(sx, sy, 0, sx, sy, r * z); gr.addColorStop(0, `rgba(0,0,0,${f})`); gr.addColorStop(.35, `rgba(0,0,0,${f})`); gr.addColorStop(1, "rgba(0,0,0,0)"); L.fillStyle = gr; L.fillRect(0, 0, vw, vh); };
+    if (nuit) trou(F.x, F.y, 210, .75); else trou(G.moi.x, G.moi.y, 190, .95);
+    trou(800, 540, 150, .8);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(lum, 0, 0); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    for (const m of MAISONS) { const habite = G.ias.some(c => c.vivant && c.maison === m) || G.moi.maison === m; if (!habite) continue; const [sx, sy] = ecran(m.x, m.y); const gr = ctx.createRadialGradient(sx, sy, 0, sx, sy, 34 * z); gr.addColorStop(0, `rgba(255,190,90,${m === G.moi.maison ? .55 : .3 * a})`); gr.addColorStop(1, "rgba(255,190,90,0)"); ctx.fillStyle = gr; ctx.fillRect(sx - 40 * z, sy - 40 * z, 80 * z, 80 * z); }
+    ctx.restore();
+  }
+  // brume de jour au-delà du regard
+  if (!nuit) { const [sx, sy] = ecran(G.moi.x, G.moi.y); const gr = ctx.createRadialGradient(sx, sy, VUE * z * .82, sx, sy, VUE * z * 1.08); gr.addColorStop(0, "rgba(225,228,215,0)"); gr.addColorStop(1, "rgba(225,228,215,.55)"); ctx.fillStyle = gr; ctx.fillRect(0, 0, vw, vh); }
+  // étiquettes et bulles en coordonnées écran
+  if (!nuit) for (const c of persos) {
+    if (!c.humain && dist(c, G.moi) > VUE) continue;
+    const [sx, sy] = ecran(c.x, c.y);
+    ctx.font = "600 12px 'Alegreya Sans', system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(10,12,18,.65)"; const w = ctx.measureText(c.nom).width + 8; ctx.fillRect(sx - w / 2, sy + 15 * z, w, 15);
+    ctx.fillStyle = c.humain ? "#f3d18a" : "#f2ede2"; ctx.fillText(c.nom, sx, sy + 15 * z + 11.5);
+    if (c.bulle && c.bulle.fin > t) bulle(ctx, sx, sy - 34 * z, dist(c, G.moi) < OUIE || c === G.dialogueAvec ? c.bulle.texte : "…");
+    if (c === G.dialogueAvec) { ctx.strokeStyle = "#e5a84b"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, 22 * z, 0, 7); ctx.stroke(); }
+  }
+  // cercle d'écoute autour du juge
+  if (!nuit && G.phase === "jour") { const [sx, sy] = ecran(G.moi.x, G.moi.y); ctx.setLineDash([3, 6]); ctx.strokeStyle = "rgba(255,240,200,.35)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy, OUIE * z, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+  rendreHorloge();
+}
+function feu(g, x, y, t, s) {
+  for (let k = 0; k < 7; k++) { const f = (t / 260 + k * .37) % 1, h = (1 - f) * 22 * s; g.fillStyle = `rgba(${255},${140 + 80 * f | 0},${40},${.7 * (1 - f)})`; g.beginPath(); g.ellipse(x + Math.sin(k * 2 + t / 300) * 6 * s, y - f * 26 * s, h * .45 + 2, h * .55 + 2, 0, 0, 7); g.fill(); }
+  g.fillStyle = "#3a2a1c"; g.fillRect(x - 14 * s, y + 4 * s, 28 * s, 5 * s);
+}
+function fumee(g, x, y, t) { for (let k = 0; k < 6; k++) { const f = (t / 3000 + k / 6) % 1; g.fillStyle = `rgba(200,200,205,${.35 * (1 - f)})`; g.beginPath(); g.arc(x + f * 30 + Math.sin(t / 700 + k) * 6, y - f * 70, 6 + f * 14, 0, 7); g.fill(); } }
+function bonhomme(g, c, t) {
+  const bob = c.marche ? Math.sin(t / 90 + (c.i || 0)) * 2 : 0;
+  g.fillStyle = "rgba(0,0,0,.28)"; g.beginPath(); g.ellipse(c.x + 3, c.y + 12, 11, 5, 0, 0, 7); g.fill();
+  if (c.humain && obscurite() > .1) { const gr = g.createRadialGradient(c.x + 12, c.y - 6, 0, c.x + 12, c.y - 6, 30); gr.addColorStop(0, "rgba(255,200,110,.6)"); gr.addColorStop(1, "rgba(255,200,110,0)"); g.fillStyle = gr; g.fillRect(c.x - 20, c.y - 40, 64, 64); }
+  g.fillStyle = c.couleur; g.beginPath(); g.ellipse(c.x, c.y + 2 + bob * .3, 12, 10, 0, 0, 7); g.fill();
+  g.strokeStyle = "rgba(0,0,0,.35)"; g.lineWidth = 1.5; g.stroke();
+  g.fillStyle = "#e9c9a6"; g.beginPath(); g.arc(c.x, c.y - 9 + bob, 7.5, 0, 7); g.fill();
+  g.fillStyle = c.cheveux; g.beginPath(); g.arc(c.x, c.y - 11 + bob, 7.5, Math.PI * 1.05, Math.PI * 1.95); g.fill();
+  if (c.humain) { g.fillStyle = "#e5a84b"; g.beginPath(); g.arc(c.x + 12, c.y - 2, 4, 0, 7); g.fill(); g.strokeStyle = "#5a3d16"; g.lineWidth = 1; g.stroke(); }
+}
+function bulle(g, x, y, texte) {
+  g.font = "14px 'Alegreya Sans', system-ui, sans-serif"; g.textAlign = "left";
+  const mots = texte.split(" "), lignes = []; let l = "";
+  for (const m of mots) { const e = l ? l + " " + m : m; if (g.measureText(e).width > 230 && l) { lignes.push(l); l = m; } else l = e; }
+  if (l) lignes.push(l);
+  const L = lignes.slice(0, 4), w = Math.max(...L.map(s => g.measureText(s).width)) + 16, h = L.length * 17 + 10;
+  const bx = Math.max(6, Math.min(vw - w - 6, x - w / 2)), by = Math.max(6, y - h);
+  g.fillStyle = "rgba(250,246,236,.96)"; g.strokeStyle = "#2a2116"; g.lineWidth = 1.5;
+  g.beginPath(); g.roundRect(bx, by, w, h, 8); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(x - 6, by + h); g.lineTo(x, by + h + 7); g.lineTo(x + 6, by + h); g.fill();
+  g.fillStyle = "#1d1810"; L.forEach((s, i) => g.fillText(s, bx + 8, by + 18 + i * 17));
+}
+
+/* ============================================================ interface */
+function el(tag, cls, txt) { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+let toastFin = 0;
+function toast(html) { const t = document.getElementById("toast"); t.innerHTML = html; t.hidden = false; toastFin = perf() + 4500; setTimeout(() => { if (perf() >= toastFin - 50) t.hidden = true; }, 4600); }
+function noter(type, texte, c) {
+  G.journal.unshift({ type, texte, h: G.phase === "nuit" ? "nuit" : heure(G.minute), jour: G.jour });
+  if (G.journal.length > 120) G.journal.pop();
+  rendreJournal();
+}
+function rendreJournal() {
+  const box = document.getElementById("entrees"); box.replaceChildren();
+  const TAG = { vu: "vu", entendu: "entendu", reponse: "réponse", nuit: "nuit", annonce: "", contradiction: "contradiction" };
+  for (const e of G.journal) { const d = el("div", "entree " + e.type); d.append(el("span", "h", e.h === "nuit" ? `N${e.jour}` : `J${e.jour} ${e.h}`)); const t = el("span", "t"); if (TAG[e.type]) t.append(el("span", "tag", TAG[e.type])); t.append(document.createTextNode(e.texte)); d.append(t); box.append(d); }
+}
+function rendreEnjeu() {
+  const e = document.getElementById("enjeu"); e.replaceChildren();
+  for (let k = 0; k < 3; k++) e.append(el("span", "pip" + (k < G.chances ? " plein" : "")));
+  e.append(el("span", null, `${G.chances} erreur${G.chances > 1 ? "s" : ""} possible${G.chances > 1 ? "s" : ""}`));
+}
+let hDerniere = "";
+function rendreHorloge() { const h = G.phase === "nuit" ? `Nuit ${G.jour}` : `Jour ${G.jour} · ${heure(G.minute)}`; if (h !== hDerniere) { hDerniere = h; document.getElementById("horloge").textContent = h + (G.pause ? " · pause" : ""); } }
+
+const touches = new Set();
+addEventListener("keydown", e => { if (e.target.closest("input,textarea")) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(k)) e.preventDefault(); if (k === " ") { e.preventDefault(); basculerPause(); return; } if (k === "Escape") fermerDialogue(); touches.add(k); });
+addEventListener("keyup", e => { touches.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key); });
+cv.addEventListener("pointerdown", e => {
+  if (!G || G.phase !== "jour") return;
+  const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const wx = (sx - vw / 2) / cam.z + cam.x, wy = (sy - vh / 2) / cam.z + cam.y;
+  const cible = vivantsIA().filter(c => dist(c, G.moi) <= VUE).find(c => Math.hypot((c.x - wx) * cam.z, (c.y - 4 - wy) * cam.z) < 24);
+  document.getElementById("aide").hidden = true;
+  if (cible) { if (dist(cible, G.moi) < 70) { G.moi.chemin = []; ouvrirDialogue(cible); } else { G.moi.chemin = [{ x: cible.x, y: cible.y + 20 }]; G.moi.versIA = cible; } return; }
+  fermerDialogue(); G.moi.versIA = null; G.moi.chemin = [{ x: wx, y: wy }];
+});
+function basculerPause() { if (!G) return; G.pause = !G.pause; document.getElementById("btn-pause").textContent = G.pause ? "Reprendre" : "Pause"; hDerniere = ""; }
+document.getElementById("btn-pause").onclick = basculerPause;
+document.getElementById("btn-vitesse").onclick = e => { G.vitesse = G.vitesse === 1 ? 2 : 1; e.target.textContent = `Vitesse ×${G.vitesse}`; };
+document.getElementById("btn-nouvelle").onclick = () => { fermerVoile(); fermerDialogue(); nouvellePartie(); };
+document.addEventListener("visibilitychange", () => { if (document.hidden && G && !G.pause) basculerPause(); });
+
+window.__hameau = { get G() { return G; } };   // accès de test
+genererFond();
+nouvellePartie();
+redimensionner();
+requestAnimationFrame(boucle);
+})();
+</script>

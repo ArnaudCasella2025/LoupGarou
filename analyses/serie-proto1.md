@@ -16,7 +16,7 @@ Règle : 5 parties d'affilée sans modifier prompts ni règles. Si un critère �
 | # | Date | IA | Résultat | Jour | Élim. utilisées | Appels (relances) | Tokens entrée | Indice vers le loup | Faits faux | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 01/10 | rapides | Victoire | 3 | 2/3 (J1 passé) | 65 (5 = 7,7 %) | ~261 k | Visions de Marc (Hugo, Camille innocents) + neutralité de Julien | 3-4 | 6/10 |
-| 2 | 02/10 | rapides, **sans Voyante** | Défaite | 3 | 3/3 | 72 (7 = 9,7 %) | ~292 k | Faibles : Sophie jamais visée, suiveuse (vise après Marc puis après Thomas), contradiction privée avec Hugo sur qui a contacté qui | 2-3 | ? |
+| 2 | 02/10 | rapides, **sans Voyante** | Défaite | 3 | 3/3 | 72 (7 = 9,7 %) | ~292 k | Faibles : Sophie jamais visée, suiveuse (vise après Marc puis après Thomas), contradiction privée avec Hugo sur qui a contacté qui | 2-3 | 6,5/10 |
 
 ## Partie 1 — notes
 

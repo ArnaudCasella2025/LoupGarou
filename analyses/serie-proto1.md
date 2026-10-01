@@ -128,6 +128,7 @@ Mesure demandée au joueur : nombre de messages incompréhensibles par partie. P
 | # | Date | IA | Voyante | Résultat | Jour | Élim. | Appels (relances) | Raisons des relances | Tokens entrée | Indice vers le loup | Messages incompréhensibles | Note |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 02/10 | ? (rapides supposé) | non | Victoire | 2 | 1/3 (J1 passé) | 39 (7 = 18 %) | trop long 6 · approbation 1 | ~128 k | Marc affirme à tort que Léa et Julien sont restés muets, puis dévore Léa ; 5 IA relèvent l'erreur sous des angles différents | ≈ 20 % (contre ≈ 80 % avant, estimation du joueur) | 7/10 |
+| 2 | 02/10 | rapides | oui | Victoire | 3 | 2/3 (Chloé J2, Camille J3) | 73 (14 = 19 %) | trop long 9 · approbation 2 · JSON invalide 2 · répétition 1 | ~282 k | Élodie (Voyante) transmet en privé « Camille est Loup-Garou » | non mesuré (meilleur que série 2) | 7,5/10 |
 
 ## Série 3, partie 1 — notes (sans Voyante)
 
@@ -144,3 +145,20 @@ Constats :
 - Relances 18 %, dont 6 « trop long » : les phrases complètes demandent plus de mots ; piste : limite à 60 mots si confirmé.
 
 Retour du joueur : « c'était bien pour les IA » ; messages incompréhensibles estimés à 20 % contre 80 % avant la correction.
+
+## Série 3, partie 2 — notes (avec Voyante)
+
+Rôles : Élodie Voyante (meneur) · **Camille Loup-Garou (naïf optimiste)** · Chloé Villageoise · Julien Villageois · Sophie et Nicolas Villageois (dévorés).
+
+- N1 : Élodie sonde Julien → Villageois ; N2 : Camille → Loup-Garou. Visions transmises au juge en privé.
+- J2 : le juge joue un rôle théâtral contre Chloé, qui est éliminée (Villageoise).
+- Camille se défend avec un argument habile : « pourquoi le Loup tuerait-il celui qui m'accuse ? ».
+- Julien finit par soupçonner la vraie Voyante parce qu'elle « répète sans expliquer ».
+- J3 : Camille éliminée (Loup-Garou).
+
+Constats :
+- Langue claire dans l'ensemble ; quelques accrocs : « se taisantdefault » (mot collé), « on n'élimait pas », genre des autres joueurs mal deviné (« il » pour Camille) : la vue ne donne pas le genre des prénoms.
+- Voyante efficace en privé ; loup crédible.
+- Relances 19 %, dont 9 « trop long » sur 14 : **critère 1 en échec, cause confirmée deux parties de suite**.
+
+Correction proposée pour la série 4 : limite des messages portée de 50 à 60 mots (correction unique et ciblée).

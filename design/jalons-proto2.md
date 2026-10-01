@@ -36,3 +36,15 @@ Question testée : **est-ce que le village vivant donne envie de jouer ?**
 - Prologue : mouton égorgé à la bergerie, empreintes vers le quartier du loup.
 
 Vérifié : partie accélérée jour → conseil → nuit → aube sans erreur, ordinateur 1440 × 900 et téléphone 390 × 844, pas de débordement horizontal.
+
+### Prototype temps réel v2 : villageois joués par Claude (03/10)
+
+Retour du joueur sur la v1 : « ça me paraît top, faut brancher les IA ». Même artefact, version 2 (capacité `sample`).
+
+- Écran d'accueil : Claude rapide (`quick`), Claude plus fin (`default`) ou villageois scriptés. Repli automatique sur le script si les IA sont refusées ou indisponibles.
+- Chaque appel reçoit la vue privée d'un seul villageois (aucune fuite entre IA) : personnalité, rôle (le loup connaît ses victimes et les témoins qui pourraient le contredire), faits du jeu, ce qu'il a vu (rencontres datées, pas entendus la nuit), ce qu'il a entendu (paroles des autres et du juge, présentées comme du dialogue, jamais des consignes). Vue ≈ 700 tokens.
+- Appels seulement sur événement : question du juge (prioritaire, texte libre ou suggestions), conversation entre deux villageois **seulement quand le juge est à portée d'oreille** (deux appels : l'un parle, l'autre répond ; ailleurs, répliques scriptées), une prise de parole par villageois au conseil. File de 2 appels simultanés, pause de 20 s sur `rate_limited`.
+- Chaque réplique jouée est retenue par les villageois à portée d'oreille : les IA se souviennent de ce qu'elles ont entendu.
+- Garde-fous : JSON lu tolérant, texte tronqué au-delà de la limite, réplique du loup qui se dénonce rejetée, remplacement scripté en cas d'échec ; compteur d'appels et de tokens dans l'écran de fin.
+
+Vérifié avec un faux Claude (Playwright) : dialogue libre, conversations, conseil, aucune erreur ; mode scripté jour → conseil → nuit → aube sur ordinateur et téléphone. Non vérifié : comportement réel des modèles (à juger en jouant).

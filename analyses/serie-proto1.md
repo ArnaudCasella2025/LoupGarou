@@ -68,7 +68,7 @@ Mêmes critères que la série 1. Conseillé : au moins une partie avec Voyante 
 
 | # | Date | IA | Voyante | Résultat | Jour | Élim. utilisées | Appels (relances) | Tokens entrée | Indice vers le loup | Avis divers ? | Faits faux | Note |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 02/10 | rapides | non | Victoire | 3 | 2/3 (J1 passé) | 83 (10 = 12 %) | ~330 k | Léa, sans aucune accusation jusque-là, vise le plus accusé (Marc) juste après la remarque du juge sur la discrétion ; Camille la notait à 55 | ✓ deux camps, angles visibles | 2-3 | ? |
+| 1 | 02/10 | rapides | non | Victoire | 3 | 2/3 (J1 passé) | 83 (10 = 12 %) | ~330 k | Léa, sans aucune accusation jusque-là, vise le plus accusé (Marc) juste après la remarque du juge sur la discrétion ; Camille la notait à 55 | ✓ deux camps, angles visibles | 2-3 |7,5/10 |
 
 ## Série 2, partie 1 — notes (sans Voyante)
 

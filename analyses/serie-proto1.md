@@ -127,3 +127,18 @@ Mesure demandée au joueur : nombre de messages incompréhensibles par partie. P
 
 | # | Date | IA | Voyante | Résultat | Jour | Élim. | Appels (relances) | Raisons des relances | Tokens entrée | Indice vers le loup | Messages incompréhensibles | Note |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 02/10 | ? (rapides supposé) | non | Victoire | 2 | 1/3 (J1 passé) | 39 (7 = 18 %) | trop long 6 · approbation 1 | ~128 k | Marc affirme à tort que Léa et Julien sont restés muets, puis dévore Léa ; 5 IA relèvent l'erreur sous des angles différents | 0 relevé | ? |
+
+## Série 3, partie 1 — notes (sans Voyante)
+
+Rôles : Sophie Villageoise (meneur) · Hugo Villageois (discret) · Nicolas Villageois (émotif) · Camille Villageoise (naïf) · **Marc Loup-Garou (paranoïaque)** · Léa Villageoise (sceptique) · Julien Villageois (stratège).
+
+- J1 : tour de table ; Marc dit que Léa et Julien « restent muets » (faux) ; Julien le relève. Journée passée.
+- N1 : Marc dévore Léa. Privé Marc → Camille (recherche d'alliance).
+- J2 : Sophie (« pourquoi Marc invente des faits ? »), Camille, Hugo, Julien, Nicolas visent Marc ; Marc reconnaît « une erreur ». Marc éliminé (Loup-Garou).
+
+Constats :
+- Langue nettement plus claire : phrases complètes, destinataires explicites, aucun message incompréhensible relevé à la lecture.
+- Convergence de plusieurs angles sur un fait vérifiable (signal réel, pas un lynchage de style).
+- Loup faible (mensonge vérifiable + dévore sa propre cible) : victoire facilitée. Le joueur parle de « coup de bol ».
+- Relances 18 %, dont 6 « trop long » : les phrases complètes demandent plus de mots ; piste : limite à 60 mots si confirmé.

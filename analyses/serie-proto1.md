@@ -127,7 +127,7 @@ Mesure demandée au joueur : nombre de messages incompréhensibles par partie. P
 
 | # | Date | IA | Voyante | Résultat | Jour | Élim. | Appels (relances) | Raisons des relances | Tokens entrée | Indice vers le loup | Messages incompréhensibles | Note |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 02/10 | ? (rapides supposé) | non | Victoire | 2 | 1/3 (J1 passé) | 39 (7 = 18 %) | trop long 6 · approbation 1 | ~128 k | Marc affirme à tort que Léa et Julien sont restés muets, puis dévore Léa ; 5 IA relèvent l'erreur sous des angles différents | 0 relevé | ? |
+| 1 | 02/10 | ? (rapides supposé) | non | Victoire | 2 | 1/3 (J1 passé) | 39 (7 = 18 %) | trop long 6 · approbation 1 | ~128 k | Marc affirme à tort que Léa et Julien sont restés muets, puis dévore Léa ; 5 IA relèvent l'erreur sous des angles différents | ≈ 20 % (contre ≈ 80 % avant, estimation du joueur) | 7/10 |
 
 ## Série 3, partie 1 — notes (sans Voyante)
 
@@ -142,3 +142,5 @@ Constats :
 - Convergence de plusieurs angles sur un fait vérifiable (signal réel, pas un lynchage de style).
 - Loup faible (mensonge vérifiable + dévore sa propre cible) : victoire facilitée. Le joueur parle de « coup de bol ».
 - Relances 18 %, dont 6 « trop long » : les phrases complètes demandent plus de mots ; piste : limite à 60 mots si confirmé.
+
+Retour du joueur : « c'était bien pour les IA » ; messages incompréhensibles estimés à 20 % contre 80 % avant la correction.

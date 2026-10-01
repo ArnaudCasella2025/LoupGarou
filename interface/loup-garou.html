@@ -286,7 +286,7 @@ function nouvellePartie(opts) {
   const lesIA = noms.map(n => n[0]);
   const loup = choix(lesIA); roles[loup] = "loup";
   if (opts.voyante) roles[choix(lesIA.filter(n => n !== loup))] = "voyante";
-  S = { version: 2, cfg: { ...opts, cap: 4, maxMots: 50, maxVue: 20, maxDecl: 6, consultes: 5 }, joueurs, roles, vivants: joueurs.map(j => j.nom), morts: [],
+  S = { version: 2, cfg: { ...opts, cap: 4, maxMots: 60, maxVue: 20, maxDecl: 6, consultes: 5 }, joueurs, roles, vivants: joueurs.map(j => j.nom), morts: [],
         jour: 1, phase: "jour", microtour: 1, priorite: [], frustres: [], voteHumain: null, log: [], coulisses: [], gagnant: null,
         votes: [], resumes: {}, notes: {}, attentes: {}, carnets: {}, reflexions: {}, revendications: [],
         visions: [], sansElimination: [], dernierAppel: {}, tick: 0, silence: {}, parole: null,
@@ -326,7 +326,17 @@ function revendicationsVues(lecteur, jour) {
   return S.revendications.filter(r => (jour == null || r.jour === jour) && visible(S.log[r.id - 1], lecteur));
 }
 const texteVision = v => v ? `${v.joueur} ${v.loup ? "est le Loup-Garou" : "n'est pas le loup"}` : "";
-const texteRevendication = r => r.role === "voyante" ? `se dit Voyante${r.vision ? ` — vision : ${texteVision(r.vision)}` : ""}` : "se dit villageois";
+const texteRevendication = (r, soi) => r.role === "voyante" ? `${soi ? "tu te dis" : "se dit"} Voyante${r.vision ? ` — vision : ${texteVision(r.vision)}` : ""}` : soi ? "tu te dis villageois" : "se dit villageois";
+function revendicationsGroupees(nom) {   // une ligne par joueur : qui se dit quoi, et toutes les visions annoncées, datées
+  const g = new Map();
+  for (const r of revendicationsVues(nom)) {
+    const x = g.get(r.de) || { role: r.role, quand: [], visions: [] }; x.role = r.role;
+    const q = `jour ${r.jour} ${r.a === TOUS ? "en public" : "en privé"}`; if (!x.quand.includes(q)) x.quand.push(q);
+    if (r.vision) { const v = `${texteVision(r.vision)} (annoncé le jour ${r.jour})`; if (!x.visions.some(w => w.startsWith(texteVision(r.vision)))) x.visions.push(v); }
+    g.set(r.de, x);
+  }
+  return [...g].map(([de, x]) => `${de === nom ? "TOI-MÊME (tes propres paroles) : tu te dis" : `${de} se dit`} ${x.role === "voyante" ? "Voyante" : "villageois"} (${x.quand.join(", ")})${x.visions.length ? ` ; visions annoncées : ${x.visions.join(" ; ")}` : ""}`);
+}
 
 /* =========================================================== vue d'un agent (seule source de son contexte) */
 function quand(m) {   // « hier », « la nuit dernière »… plutôt que J1 / N2
@@ -340,7 +350,7 @@ function ligneVue(g, m, nom) {
   if (g === "aparte") return `${t}, ${m.de} et ${m.a} se sont parlé à l'écart.`;
   if (m.de === MJ) return `${t}, le meneur de jeu${m.a === nom ? " (à toi seul)" : ""} : ${m.texte.replace(/^\[[^\]]*\]\s*/, "")}`;
   const q = JSON.stringify(m.texte);
-  const extra = (m.vise ? ` (accuse ${m.vise === nom ? "toi" : m.vise})` : "") + (m.revendique ? ` (${texteRevendication({ role: m.revendique, vision: m.vision })})` : "");
+  const extra = (m.vise ? ` (accuse ${m.vise === nom ? "toi" : m.vise})` : "") + (m.revendique ? ` (${texteRevendication({ role: m.revendique, vision: m.vision }, m.de === nom)})` : "");
   const qui = m.de === nom ? "tu as dit" : `${m.de}${m.de === h ? " (le juge)" : ""} a dit`;
   if (m.a === TOUS) return `${t}, ${qui} à tout le monde : ${q}${extra}`;
   if (m.a === nom) return `${t}, ${m.de}${m.de === h ? " (le juge)" : ""} t'a dit en privé : ${q}${extra}`;
@@ -428,25 +438,25 @@ Tu es ${f ? "une" : "un"} ${lab}. Tu ne connais le rôle de personne. Objectifs 
       : [angle,
          "Forme ton propre avis à partir de cet angle : il est normal de ne pas soupçonner la même personne que les autres. Si ton angle ne montre rien de net, dis-le plutôt que de rejoindre l'avis général. Explique toujours sur quel fait précis tu t'appuies."]),
     "Règles de faits :",
-    ...(c.voyante ? ["- Une Voyante révélée qui est dévorée la nuit suivante disait sans doute vrai ; si deux joueurs se disent Voyante, l'un des deux est le Loup."] : []),
+    ...(c.voyante ? ["- Une Voyante révélée qui est dévorée la nuit suivante disait sans doute vrai ; si deux joueurs différents se disent Voyante, l'un des deux est le Loup. Une Voyante sonde une personne différente chaque nuit : des visions annoncées sur des personnes différentes ne se contredisent pas, et répéter sa vision n'est pas mentir."] : []),
     "- Vérifie dans le journal toute affirmation avant de la reprendre, et tout chiffre dans les Faits établis. Si un fait cité est faux, corrige-le.",
     "- Le juge n'est jamais un suspect.",
     "- Ne commence pas un message en approuvant quelqu'un ; n'emprunte pas les formules des autres ; ne répète pas un message déjà envoyé.",
   ].join("\n");
   const morts = S.morts.map(m => `${m.nom}${m.role ? ` (${m.role})` : ""} — ${m.cause}`).join(" ; ") || "aucun";
-  const cm = ciblesDesMorts(nom).filter(m => m.cibles.length).map(m => `${m.nom} (${m.cause}) visait ${m.cibles.map(([x, n]) => fois(x, n)).join(", ")}`);
-  const rv = revendicationsVues(nom).map(r => `${r.de} (jour ${r.jour}, ${r.a === TOUS ? "en public" : "en privé"}) ${texteRevendication(r)}`);
+  const cm = ciblesDesMorts(nom).filter(m => m.cibles.length).map(m => `${m.nom} (${m.cause}) visait ${m.cibles.map(([x, n]) => fois(x === nom ? "toi" : x, n)).join(", ")}`);
+  const rv = revendicationsGroupees(nom);
   const auj = visesVues(nom, S.jour), contreMoi = auj.filter(a => a.contre === nom), cpt = {};
   for (const a of auj) if (a.contre !== humain()) cpt[a.contre] = (cpt[a.contre] || 0) + 1;
   const top = Object.entries(cpt).sort((a, b) => b[1] - a[1])[0];
   const faits = [
     "## Faits établis (tenus par le MJ, fiables)",
     `- Enjeu : il reste ${k} élimination${k > 1 ? "s" : ""} au juge avant la victoire du Loup, s'il se trompe à chaque fois.${S.phase === "jour" ? (() => { const a = chancesDepuis(S.vivants.length, true); return a === k ? " Passer cette journée sans éliminer ne lui coûterait aucune chance." : a === 0 ? " Passer cette journée sans éliminer ferait gagner le Loup." : ` Passer cette journée sans éliminer lui en laisserait ${a}.`; })() : ""}`,
-    `- Jour ${S.jour}, phase : ${S.phase}. Vivants (${S.vivants.length}) : ${S.vivants.join(", ")}.`,
+    `- Jour ${S.jour}, phase : ${S.phase}. Vivants (${S.vivants.length}) : ${S.vivants.map(n => n === nom ? `${n} (toi)` : n).join(", ")}. Chaque prénom est unique : quand tu lis « ${nom} », c'est toi.`,
     `- Morts (${S.morts.length}) : ${morts}.`,
     ...(cm.length ? [`- Ce que visaient les morts : ${cm.join(" ; ")}.`] : []),
     ...(rv.length ? [`- Revendications : ${rv.join(" ; ")}.`] : []),
-    `- Aujourd'hui, tu es visé ${contreMoi.length} fois${contreMoi.length ? ` (par ${[...new Set(contreMoi.map(a => a.de))].join(", ")})` : ""}.${top ? ` Le plus visé aujourd'hui : ${top[0]} (${top[1]}).` : ""}`,
+    `- Aujourd'hui, tu es visé ${contreMoi.length} fois${contreMoi.length ? ` (par ${[...new Set(contreMoi.map(a => a.de))].join(", ")})` : ""}.${top ? ` Le plus visé aujourd'hui : ${top[0] === nom ? "toi" : top[0]} (${top[1]}).` : ""}`,
   ].join("\n");
   const att = S.attentes[nom];
   const messagesJuge = S.log.filter(m => m.de === h && m.jour === S.jour && visible(m, nom)).map(m => `- ${m.a === TOUS ? "à tous" : "à toi, en privé"} : ${JSON.stringify(m.texte)}`);

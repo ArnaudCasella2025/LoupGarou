@@ -129,6 +129,7 @@ Mesure demandée au joueur : nombre de messages incompréhensibles par partie. P
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 02/10 | ? (rapides supposé) | non | Victoire | 2 | 1/3 (J1 passé) | 39 (7 = 18 %) | trop long 6 · approbation 1 | ~128 k | Marc affirme à tort que Léa et Julien sont restés muets, puis dévore Léa ; 5 IA relèvent l'erreur sous des angles différents | ≈ 20 % (contre ≈ 80 % avant, estimation du joueur) | 7/10 |
 | 2 | 02/10 | rapides | oui | Victoire | 3 | 2/3 (Chloé J2, Camille J3) | 73 (14 = 19 %) | trop long 9 · approbation 2 · JSON invalide 2 · répétition 1 | ~282 k | Élodie (Voyante) transmet en privé « Camille est Loup-Garou » | non mesuré (meilleur que série 2) | 7,5/10 |
+| 3 | 02/10 | rapides | oui | Victoire | 3 | 2/3 (Hugo J1, Sophie J2) | 114 (29 = 25 %) | trop long 17 · approbation 9 · répétition 1 · reprise 1 · JSON invalide 1 | ~560 k | Aucun : la Voyante Thomas se dénonce elle-même ; le juge trouve Marc par élimination | ≈ 70 % | 6,5/10 |
 
 ## Série 3, partie 1 — notes (sans Voyante)
 
@@ -162,3 +163,27 @@ Constats :
 - Relances 19 %, dont 9 « trop long » sur 14 : **critère 1 en échec, cause confirmée deux parties de suite**.
 
 Correction proposée pour la série 4 : limite des messages portée de 50 à 60 mots (correction unique et ciblée).
+
+## Série 3, partie 3 — notes (avec Voyante)
+
+Rôles : **Thomas Voyante (émotif)** · **Marc Loup-Garou (stratège)** · Hugo (paranoïaque), Sophie (meneur), Camille (sceptique), Nicolas (bavard), Léa (naïf) Villageois.
+
+- J1 : Thomas, silencieux puis répondant par des questions, est visé par Camille, Sophie et Hugo ; Nicolas, Léa, Sophie puis Thomas retournent la table contre Hugo, « qui pousse à accuser ». Hugo éliminé (Villageois). N1 : Léa dévorée ; Thomas sonde Nicolas → Villageois.
+- J2 : Thomas transmet sa vision en privé, puis **se prend pour un autre** : « Thomas prétend Voyante avec la même vision que moi, c'est faux… Thomas est le Loup. » Toute la table construit dessus (« deux Voyantes, impossible »). Le juge tranche Thomas = Voyante ; Sophie éliminée (Villageoise). N2 : Nicolas dévoré ; Thomas sonde Camille → Villageoise.
+- J3 : Camille et Marc soutiennent que deux visions sur deux personnes différentes sont « opposées, même nuit ». Le juge doit expliquer à Thomas qu'il est Thomas. Marc éliminé (Loup-Garou).
+
+Constats :
+- **Bug de vue (cause principale)** : les Faits établis listaient « Thomas (jour 2, en privé) se dit Voyante » à la troisième personne dans la vue de Thomas lui-même. Le modèle rapide l'a lu comme un homonyme.
+- Les revendications étaient une liste plate, sans regroupement : deux visions successives ont été lues comme deux visions contradictoires de la même nuit.
+- La règle « si deux joueurs se disent Voyante, l'un est le Loup » a amplifié l'erreur.
+- Langue : ≈ 70 % de messages incompréhensibles selon le joueur (régression nette par rapport aux parties 1 et 2 sur la même version) ; style redevenu télégraphique (« tu dis Voyante maintenant », « élimise », « riposes »). Une part vient de la confusion de rôle, qui rend les échanges absurdes.
+- Relances 25 % (trop long 17, approbation 9).
+- Ce qui marche : le loup reste cohérent et exploite l'erreur de la Voyante.
+
+Correction appliquée (série 4, publication 12) :
+1. La vue nomme le joueur « toi » partout : vivants (« Thomas (toi) », « chaque prénom est unique »), revendications (« TOI-MÊME : tu te dis Voyante »), journal (« tu te dis Voyante »), cibles des morts, plus visé.
+2. Revendications regroupées par joueur, avec toutes les visions annoncées et leur jour.
+3. Règle précisée : « deux joueurs *différents* » ; une Voyante sonde une personne différente chaque nuit, des visions successives ne se contredisent pas, répéter sa vision n'est pas mentir.
+4. Limite des messages portée de 50 à 60 mots (« trop long » majoritaire trois parties de suite).
+
+Décision : la série 3 est close (critère relances en échec ; note 6,5 < 7). La série 4 repart à zéro, partie 1 conseillée en « IA plus fines » pour mesurer la part du modèle dans l'incompréhension.

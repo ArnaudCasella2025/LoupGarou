@@ -68,3 +68,22 @@ Mêmes critères que la série 1. Conseillé : au moins une partie avec Voyante 
 
 | # | Date | IA | Voyante | Résultat | Jour | Élim. utilisées | Appels (relances) | Tokens entrée | Indice vers le loup | Avis divers ? | Faits faux | Note |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 02/10 | rapides | non | Victoire | 3 | 2/3 (J1 passé) | 83 (10 = 12 %) | ~330 k | Léa, sans aucune accusation jusque-là, vise le plus accusé (Marc) juste après la remarque du juge sur la discrétion ; Camille la notait à 55 | ✓ deux camps, angles visibles | 2-3 | ? |
+
+## Série 2, partie 1 — notes (sans Voyante)
+
+Rôles : Thomas Villageois (sceptique) · Sophie Villageoise (émotif) · Marc Villageois (stratège) · Camille Villageoise (paranoïaque) · **Léa Loup-Garou (bavard)** · Hugo Villageois (naïf) · Chloé Villageoise (discret).
+
+- J1 : Thomas vise Marc (« Loup parmi nous trois » puis recul) ; Marc vise Thomas ; Camille défend Thomas auprès du juge et surveille Marc–Hugo. Journée passée.
+- N1 : Léa dévore Thomas (qui visait Marc). Marc écrit à Hugo.
+- J2 : Hugo révèle le privé de Marc et vise Marc ; Sophie vise Marc puis Hugo (« abandonne son allié ») ; Marc, Camille, Chloé visent Hugo. Hugo (Villageois) éliminé.
+- N2 : Léa dévore Sophie (qui visait Marc). Marc et Camille écrivent à Léa.
+- J3 : « trois morts visaient Marc » ; Marc et Camille visent Chloé, Chloé et Léa visent Marc. Le juge : « la discrétion, stratégie du loup ? » → Léa, sans accusation jusque-là, vise aussitôt Marc ; le juge relève le timing et élimine Léa (Loup-Garou).
+
+Constats :
+- Correction validée sur ce point : avis divergents, plus de lynchage à sept voix, plus de jargon de la méthode.
+- Loup habile : victimes choisies parmi les accusateurs de Marc pour l'incriminer.
+- Faits faux : « aparté privé Thomas–Marc » (Camille), « aparté visible J2 » (Marc), « Marc vise Chloé J3, l'accuse N1 » (Léa).
+- Relances 12 % : probablement le filtre de jargon ; à vérifier sur la partie suivante.
+- Nouvelles formules émergentes : « c'est mon fil », « profite du chaos ».
+- Hugo éliminé pour un retournement qu'il avait lui-même expliqué en révélant un privé.

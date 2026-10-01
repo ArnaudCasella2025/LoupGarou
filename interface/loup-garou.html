@@ -35,6 +35,7 @@ h1 { font: 400 1.7rem/1 var(--f-display); margin: 0; letter-spacing: .02em; text
 .enjeu .pips { display: inline-flex; gap: 4px; }
 .enjeu .pip { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--blood); }
 .enjeu .pip.plein { background: var(--blood); }
+.enjeu .conseil { font-size: .8rem; color: var(--candle); }
 .enjeu .chiffre { font: 500 .8rem var(--f-mono); font-variant-numeric: tabular-nums; color: var(--muted); }
 .outils { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .statut { font-size: .9rem; color: var(--muted); min-height: 1.3em; }
@@ -391,6 +392,7 @@ Tu es le LOUP-GAROU. Personne d'autre ne le sait. Si tu es éliminé, tu as perd
 - Tu te dis villageois, tu n'avoues jamais. Quand on te vise, défends-toi aussitôt avec des faits du journal et détourne les soupçons vers un innocent crédible.${c.voyante ? `\n- Si une Voyante t'accuse, prétends-toi Voyante à ton tour (champ "revendique") et annonce une fausse vision contre un innocent : ${h} devra choisir qui croire.` : ""}
 - Fais-toi des alliés en privé, flatte ${h}, sème le doute, mais reste cohérent avec TES DÉCLARATIONS PRÉCÉDENTES : un menteur qui se contredit est démasqué.
 - Les villageois savent que le Loup dévore souvent ceux qui le soupçonnent : varie tes victimes pour ne pas te trahir.
+- Une Voyante révélée (ou qui t'accuse avec une vision) est ta plus grande menace : dévore-la dès la nuit suivante.
 - La nuit, ne dévore jamais le suspect principal du jour : il te sert de bouc émissaire, et sa mort l'innocenterait. Préfère quelqu'un qui te soupçonne discrètement ou qui influence le juge.
 - Un consensus contre un innocent est ta meilleure arme, mais ne sois pas celui qui le lance : renforce-le avec un fait.
 - Ce que tu dis au juge en privé compte autant que le public : il s'en souvient. Ne te contredis jamais entre les deux (par exemple nier être Voyante en privé, puis le revendiquer en public).`;
@@ -413,11 +415,12 @@ Tu es ${f ? "une" : "un"} ${lab}. Tu ne connais le rôle de personne. Objectifs 
   const methode = [
     loup ? "## Ce que les villageois vont chercher (anticipe-le)" : "## Méthode d'enquête",
     "1. Le Loup dévore souvent ceux qui le soupçonnent : regarde ce que visaient les morts (voir Faits établis).",
-    "2. Qui a poussé à éliminer un innocent ? Qui change de cible sans raison, ou suit toujours le dernier accusateur ?",
+    "2. Juge sur le fond, pas sur le style : accuser tôt, organiser le débat ou parler beaucoup n'est pas suspect en soi (il faut bien commencer). Ce qui compte : la cohérence d'un joueur dans le temps, ses changements de cible sans raison, et qui a poussé à éliminer un innocent avec de mauvais arguments.",
+    "2 bis. Le Loup se cache aussi bien dans la neutralité que dans l'agitation : méfie-toi de qui ne prend jamais de risque, approuve tout le monde, ne lance aucune piste et ne fait que rejoindre les accusations déjà lancées.",
     "3. Vérifie dans le journal toute affirmation avant de la reprendre ; si un fait cité est faux, corrige-le publiquement : un menteur se trahit ainsi.",
     ...(c.voyante ? ["4. Une Voyante révélée qui est dévorée la nuit suivante disait sans doute vrai ; si deux joueurs se disent Voyante, l'un des deux est le Loup.",
       "5. Pousser la Voyante à se révéler en public aide le Loup : c'est un indice faible, jamais une preuve."] : []),
-    "6. Si presque tout le monde accuse la même personne, demande-toi qui a lancé ce consensus et à qui il profite. Parmi les IA seulement : le juge n'est jamais un suspect.",
+    "6. Quand presque tout le monde accuse la même personne, vérifie que les arguments tiennent sur des faits, et regarde qui a rejoint le mouvement sans rien y ajouter. Parmi les IA seulement : le juge n'est jamais un suspect.",
     "7. Ne commence jamais un message en approuvant quelqu'un (« X a raison ») : dis directement ce que TU apportes. Ne reprends ni l'argument ni les formules d'un autre (« on juge le visible », « faits mesurables »…) sans y ajouter un fait nouveau, et ne répète jamais un message déjà envoyé.",
     "8. Avant de citer un chiffre (nombre de morts, de votes, d'accusations), vérifie-le dans les Faits établis.",
     "N'applique une règle que si elle correspond à un fait précis du journal.",
@@ -803,7 +806,12 @@ function resumeDuJour(J) {
   const cibles = {}; for (const a of acc) cibles[a.contre] = (cibles[a.contre] || 0) + 1;
   const plus = Object.entries(cibles).sort((a, b) => b[1] - a[1])[0];
   if (plus) L.push(["Le plus visé", `${plus[0]} (${plus[1]} fois)`]);
-  const rv = revendicationsVues(h, J).map(r => `${r.de} ${texteRevendication(r)}${r.a === TOUS ? "" : " (en privé)"}`);
+  const parTexte = new Map();
+  for (const r of revendicationsVues(h, J)) {
+    const k = `${r.de} ${texteRevendication(r)}`, canaux = parTexte.get(k) || new Set();
+    canaux.add(r.a === TOUS ? "public" : "privé"); parTexte.set(k, canaux);
+  }
+  const rv = [...parTexte].map(([k, c]) => `${k}${c.size > 1 ? " (en public et en privé)" : c.has("privé") ? " (en privé)" : ""}`);
   if (rv.length) L.push(["Revendications", rv]);
   const ap = apartesVus(J);
   L.push(["Apartés", ap.length ? ap.map(p => `${p.a} et ${p.b}${p.n > 1 ? ` ×${p.n}` : ""}`) : "aucun"]);
@@ -945,6 +953,7 @@ function rendreEnjeu() {
   const k = chancesRestantes();
   const pips = el("span", "pips"); for (let i = 0; i < 3; i++) pips.append(el("span", "pip" + (i < k ? " plein" : "")));
   e.append(el("span", "chiffre", `${S.vivants.length}/8 vivants`), pips, el("span", "chiffre", `${k} élimination${k > 1 ? "s" : ""}`), el("span", "chiffre long", "avant la défaite"));
+  if (S.phase === "jour" && chancesDepuis(S.vivants.length, true) === k) e.append(el("span", "conseil", "· passer cette journée ne te coûte aucune chance"));
   e.title = "Si tu élimines un innocent à chaque fois, voici combien d'éliminations il te reste avant que le loup gagne.";
 }
 

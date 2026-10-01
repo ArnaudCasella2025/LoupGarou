@@ -67,11 +67,34 @@ canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
 @media (max-width: 860px) { .carnet { max-height: 46svh; } }
 .carnet h2 { font: 400 1rem var(--f-display); letter-spacing: .06em; margin: 0; padding: 10px 12px 6px; color: var(--muted); }
 .entrees { overflow: auto; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 7px; min-height: 0; }
-.entree { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 6px; font-size: .9rem; }
+.entree { flex-shrink: 0; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 6px; font-size: .9rem; }
 .entree .h { font: .72rem var(--f-mono); color: var(--muted); padding-top: 3px; font-variant-numeric: tabular-nums; }
 .entree.annonce .t { color: var(--candle); }
 .entree.nuit .t { font-style: italic; }
 .entree .tag { font: 500 .66rem var(--f-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-right: 4px; }
+.btn.rouge { border-color: var(--blood); color: var(--blood); background: var(--surface); }
+.btn.rouge:hover { background: color-mix(in srgb, var(--blood) 14%, var(--surface)); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.bandeau { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(640px, calc(100% - 24px)); max-height: 62%; overflow: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 9px; box-shadow: 0 8px 30px #0008; }
+.bandeau h2 { font: 400 1.2rem var(--f-display); margin: 0; }
+.bandeau .resume { margin: 0; padding-left: 1.1em; color: var(--muted); font-size: .9rem; }
+.accuse { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: start; border-top: 1px solid var(--line); padding-top: 9px; }
+.accuse .par { color: var(--muted); font-size: .88rem; }
+.accuse p { margin: 3px 0 0; font-size: .92rem; }
+.accuse .mains { color: var(--candle); font-size: .85rem; }
+@media (max-width: 560px) { .accuse { grid-template-columns: 22px minmax(0, 1fr); } .accuse .btn { grid-column: 2; justify-self: start; } }
+.sentence { display: grid; gap: 8px; justify-items: start; }
+.carte-role { display: grid; gap: 2px; padding: 12px 18px; border-radius: 10px; border: 2px solid; min-width: 220px; }
+.carte-role b { font: 400 1.5rem var(--f-display); }
+.carte-role .lbl { font-size: .85rem; color: var(--muted); }
+.carte-role.loup { border-color: var(--blood); background: color-mix(in srgb, var(--blood) 16%, var(--surface)); }
+.carte-role.villageois { border-color: var(--candle); background: color-mix(in srgb, var(--candle) 10%, var(--surface)); }
+.arreter { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); background: var(--blood); color: #fff; border: 0; border-radius: 10px; padding: 10px 20px; font: 700 1.05rem var(--f-body); box-shadow: 0 0 0 4px color-mix(in srgb, var(--blood) 35%, transparent); }
+.entree.cri .t, .entree.corps .t { color: var(--blood); }
+.entree.indice .t { border-left: 3px solid var(--candle); padding-left: 7px; }
+.entree.accusation .t { color: var(--candle); }
+.entree.rumeur .t { color: var(--muted); font-style: italic; }
 .badge-ia { font: 500 .72rem var(--f-mono); letter-spacing: .05em; color: var(--muted); border: 1px solid var(--line); border-radius: 20px; padding: 2px 9px; }
 .saisie-dlg { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
 .saisie-dlg input { min-width: 0; border: 1px solid var(--line); background: var(--surface2); color: var(--ink); border-radius: 8px; padding: 7px 10px; font: inherit; }
@@ -103,6 +126,8 @@ canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
       <div class="toast" id="toast" hidden></div>
       <div class="aide" id="aide">Clique pour marcher · clique un villageois pour lui parler · flèches ou ZQSD</div>
       <div class="dialogue" id="dialogue" hidden></div>
+      <div class="bandeau" id="bandeau" hidden></div>
+      <button class="arreter" id="arreter" type="button" hidden>Arrêter !</button>
       <div class="voile" id="voile" hidden><div class="panneau" id="panneau"></div></div>
     </div>
     <aside class="carnet" aria-label="Carnet">
@@ -177,14 +202,22 @@ const CHEVEUX = ["#3b2a1e", "#6b4a2b", "#c9a15a", "#1f1b18", "#8a3b22", "#5a4636
 let G;   // état de la partie
 const VITESSE_JOUR = 3.4;   // minutes de jeu par seconde réelle
 const JOUR_DEBUT = 7 * 60, CLOCHE = 18 * 60 + 15, CONSEIL = 18 * 60 + 50;
+// réglages du loup chasseur et des accusations (GDD temps réel § 2 et § 4)
+const R = { isoleIA: 200, isoleLavoir: 150, flagrant: 165, cri: 340, erreurJuge: .15, interruptIA: 120, interruptJuge: 360, filatureVue: .35, essaisMax: 2, debutChasse: 9 * 60, finChasse: 17 * 60 + 45, dureeLutte: 3.5, filatureMax: 45, accusationsJour: 2, cri70: .7 };
+const ECARTS = ["grange", "moulin", "lavoir", "chapelle"];
+const heureCloche = () => CLOCHE - 30 * Math.min(2, G.peur);
+const heureConseil = () => heureCloche() + 35;
 
 function nouvellePartie() {
   const noms = melange(PRENOMS).slice(0, 7), persos = melange(PERSOS).slice(0, 7), maisons = melange(MAISONS);
   const loup = Math.floor(rnd() * 7);
   const ias = noms.map((nom, i) => ({ nom, i, perso: persos[i], couleur: COULEURS[i], cheveux: CHEVEUX[i], ia: true, loup: i === loup, vivant: true,
-    maison: maisons[i + 1], x: LIEUX.place.x, y: LIEUX.place.y, chemin: [], cible: null, lieu: "place", parle: null, cooldown: 0, vu: [], nuits: [], entendu: [], dernierLieu: null, prochain: 0, mensonges: 0 }));
+    maison: maisons[i + 1], x: LIEUX.place.x, y: LIEUX.place.y, chemin: [], cible: null, lieu: "place", parle: null, cooldown: 0, vu: [], nuits: [], entendu: [], evenements: [], dernierLieu: null, lieuPrecedent: null, ruban: false, blesse: false, signe: null, enScene: false, alpha: 1, prochain: 0, mensonges: 0 }));
   const moi = { nom: "Toi", humain: true, couleur: "#f1e6c8", cheveux: "#2a211a", maison: maisons[0], x: LIEUX.place.x, y: LIEUX.place.y + 70, chemin: [], vivant: true };
-  G = { jour: 1, minute: JOUR_DEBUT, phase: "jour", ias, moi, morts: [], victimes: [], traces: [], chances: 3, pause: false, vitesse: 1, lent: false,
+  G = { jour: 1, minute: JOUR_DEBUT, phase: "jour", ias, moi, morts: [], victimes: [], traces: [], peur: 0, pause: false, vitesse: 1, lent: false,
+    mortDuJour: false, essais: 0, chasse: { etat: "routine", t: 0 }, lutte: null, corps: [], fleche: null, vignette: 0, silhouette: 0, flagrant: null,
+    stats: { filatures: 0, attaques: 0, abandons: 0, luttes: 0, morts: 0, interrompues: 0, pasCandidat: 0, bloqueIsole: 0, bloqueJuge: 0 },
+    scene: null, accuses: [], accIA: { dernier: 0, loupFait: false }, conseil: null, sentence: null,
     convs: [], cloche: false, journal: [], vuParMoi: new Set(), sons: [], silhouette: null, nuit: null, loupMarche: null, dialogueAvec: null, fin: null, flammes: 0 };
   // placer tout le monde autour du feu
   ias.forEach((c, k) => { const a = (k / 7) * Math.PI * 2; c.x = LIEUX.place.x + Math.cos(a) * 75; c.y = LIEUX.place.y + Math.sin(a) * 55; c.prochain = 1 + rnd() * 3; });
@@ -194,7 +227,7 @@ function nouvellePartie() {
   G.traces.push({ pts: pts.slice(Math.floor(pts.length * .45)), matiere: "boue", jour: 1 });
   G.victimes.push({ nom: "un mouton", jour: 0 });
   noter("annonce", "Jour 1, aube. Un mouton a été égorgé cette nuit à la bergerie, près de la lisière. Des empreintes de loup repartent vers le village.");
-  noter("annonce", "Le Loup se cache parmi les sept villageois. Il ne peut dévorer que quelqu'un qu'il a croisé dans la journée.");
+  noter("annonce", "Le Loup se cache parmi les sept villageois. Il chasse de jour, à l'écart, et ne peut tuer que quelqu'un qu'il a croisé dans la journée. Accuse devant témoins ; au conseil du soir, élimine un accusé. S'il ne reste que deux innocents, le Loup gagne.");
   toast("Jour 1 — un mouton égorgé à la bergerie. Promène-toi, écoute, interroge.");
   rendreEnjeu(); rendreJournal();
 }
@@ -233,6 +266,7 @@ function choisirLieu(c) {
   else if (choix === "*trace") { const v = G.victimes[G.victimes.length - 1]; const m = v && v.maison ? v.maison.lieu : "grange"; choix = m; }
   else if (choix === "*ailleurs") { choix = pick(Object.keys(LIEUX).filter(l => l !== c.lieu)); }
   else if (choix === "*suivre") { const o = pick(vivantsIA().filter(o => o !== c)); choix = o?.but || o?.lieu || "place"; }
+  if (G.peur >= 2 && ECARTS.includes(choix) && rnd() < .6) choix = pick(["place", "taverne", "forge"]);   // la peur regroupe
   // le loup cherche à croiser quelqu'un l'après-midi s'il n'a encore repéré personne
   if (c.loup && periode(G.minute) === "aprem" && !rencontresDuJour(c).length) { const o = pick(vivantsIA().filter(o => o !== c && o.lieu)); if (o) choix = o.lieu; }
   return choix;
@@ -242,12 +276,14 @@ const rencontresDuJour = (c, jour = G.jour) => c.vu.filter(v => v.jour === jour 
 /* ============================================================ mémoire et perception */
 function observer() {
   const ias = vivantsIA();
-  for (const c of ias) c.lieu = dans(c.x, c.y);
+  for (const c of ias) { c.lieu = dans(c.x, c.y); if (c.lieu && c.lieu !== c.dernierLieu) { c.lieuPrecedent = c.dernierLieu; c.dernierLieu = c.lieu; } }
   for (const a of ias) for (const b of ias) {
     if (a === b || !a.lieu || a.lieu !== b.lieu) continue;
     if (!a.vu.some(v => v.jour === G.jour && v.qui === b.nom && v.lieu === a.lieu)) a.vu.push({ jour: G.jour, minute: G.minute, qui: b.nom, lieu: a.lieu });
   }
   if (G.phase !== "jour") return;
+  decouvrirCorps();
+  accusationsIA();
   // ce que le juge voit : quelqu'un dans un lieu, dans son champ de vision
   for (const c of ias) {
     if (!c.lieu || dist(c, G.moi) > VUE) continue;
@@ -259,7 +295,8 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const VUE = 430, OUIE = 165;
 
 /* ============================================================ paroles (scriptées à partir des faits) */
-const derniereVictime = () => { const v = G.victimes[G.victimes.length - 1]; return v && v.ia ? v : null; };
+const derniereVictime = () => { const v = [...G.victimes].reverse().find(v => v.ia && v.connu); return v || null; };
+function evenement(c, texte) { c.evenements.push({ jour: G.jour, minute: G.minute, texte }); if (c.evenements.length > 14) c.evenements.shift(); }
 function croiseAvec(c, victime) {   // c a-t-il vu la victime le jour où elle a été repérée ?
   return c.vu.find(v => v.jour === victime.jour && v.qui === victime.nom);
 }
@@ -283,7 +320,7 @@ function repondre(c, q) {
     }
     case "croise": {
       if (!V) return "Personne n'est mort, Dieu merci.";
-      if (c.loup) { c.mensonges++; return `Non, je n'ai pas vu ${V.nom} de la journée.`; }
+      if (c.loup) { c.mensonges++; return `Non, je n'ai pas vu ${V.nom} ce jour-là.`; }
       if (oublie) return "Je ne sais plus… La journée a été longue.";
       const v = croiseAvec(c, V);
       return v ? `Oui, ${LIEUX[v.lieu].a}, vers ${heureDite(v.minute)}.` : "Non, on ne s'est pas croisés.";
@@ -309,7 +346,7 @@ function soupcon(c) {
   if (V && V.ia) {
     let cand = avecVictime(c, V).filter(n => n !== c.nom && parNom(n)?.vivant);
     if (c.loup) cand = cand.filter(n => !parNom(n).loup);
-    if (cand.length) { const s = pick(cand); return { cible: s, raison: `${accord(s, "Il", "Elle")} était avec ${V.nom} la veille de sa mort.` }; }
+    if (cand.length) { const s = pick(cand); return { cible: s, concret: true, raison: `${accord(s, "Il", "Elle")} était avec ${V.nom} ${V.quand}.` }; }
   }
   const n = c.nuits.find(x => x.jour === G.jour);
   if (n) {
@@ -325,7 +362,7 @@ function conversation(a, b) {
   const dire = (c, t) => L.push([c, t]);
   const r = rnd();
   if (V && r < .45) {
-    dire(a, phrase(a.perso.dit, `tu as croisé ${V.nom}, la veille de sa mort ?`));
+    dire(a, phrase(a.perso.dit, `tu as croisé ${V.nom}, ${V.quand} ?`));
     dire(b, repondre(b, "croise"));
     const av = avecVictime(a, V).filter(n => n !== a.nom && n !== b.nom);
     if (av.length && !a.loup) dire(a, `Moi j'ai vu ${V.nom} avec ${av.join(" et ")}.`);
@@ -356,22 +393,26 @@ function temoinsNuit(pts, victime) {
   }
 }
 function commencerNuit() {
-  G.phase = "nuit"; G.dialogueAvec = null; fermerDialogue();
+  G.phase = "nuit"; G.dialogueAvec = null; fermerDialogue(); fermerBandeau();
   const loup = G.ias.find(c => c.loup);
-  const reperes = rencontresDuJour(loup).map(v => parNom(v.qui)).filter(c => c && c.vivant && !c.loup);
-  const victime = pick(reperes.length ? reperes : vivantsIA().filter(c => !c.loup));
-  const ns = cheminNoeuds(loup.maison.id, victime.maison.id), pts = tracerChemin(ns);
-  const avant = [...ns].reverse().find(n => LIEUX[n] && n !== victime.maison.lieu) || victime.maison.lieu;
-  G.nuit = { t: 0, duree: 30, victime, pts, matiere: LIEUX[avant].trace, aboie: new Set(), vuParFenetre: false };
-  for (const c of G.ias) { c.chemin = []; c.parle = null; if (c.vivant) { c.x = c.maison.x; c.y = c.maison.y + 26; } }
+  let victime = null, pts = [], matiere = null;
+  if (loup.vivant && !G.mortDuJour) {   // le loup n'a pas tué de jour : il tue la nuit, plus risqué pour lui
+    const reperes = rencontresDuJour(loup).map(v => parNom(v.qui)).filter(c => c && c.vivant && !c.loup);
+    victime = pick(reperes.length ? reperes : vivantsIA().filter(c => !c.loup));
+    const ns = cheminNoeuds(loup.maison.id, victime.maison.id); pts = tracerChemin(ns);
+    const avant = [...ns].reverse().find(n => LIEUX[n] && n !== victime.maison.lieu) || victime.maison.lieu;
+    matiere = LIEUX[avant].trace;
+  }
+  G.nuit = { t: 0, duree: victime ? 30 : 18, victime, pts, matiere, aboie: new Set(), vuParFenetre: false };
+  for (const c of G.ias) { c.chemin = []; c.parle = null; c.enScene = false; c.signe = null; if (c.vivant) { c.x = c.maison.x; c.y = c.maison.y + 26; } }
   G.moi.chemin = []; G.moi.x = G.moi.maison.x; G.moi.y = G.moi.maison.y + 26;
   noter("nuit", `La nuit tombe. Tu rentres chez toi. Ta fenêtre donne sur ${LIEUX[G.moi.maison.fenetre].nom}.`);
-  toast(`Nuit ${G.jour}. Ta fenêtre donne sur ${LIEUX[G.moi.maison.fenetre].nom}. Regarde bien.`);
+  toast(`Nuit ${G.jour}. Ta fenêtre donne sur ${LIEUX[G.moi.maison.fenetre].nom}.`);
 }
 function avancerNuit(dt) {
   const N = G.nuit; N.t += dt;
   const f = (N.t / N.duree - .25) / .5;   // le loup marche entre 25 % et 75 % de la nuit
-  if (f > 0 && f < 1) {
+  if (N.victime && f > 0 && f < 1) {
     const p = N.pts[Math.min(N.pts.length - 1, Math.floor(f * N.pts.length))];
     G.loupMarche = p;
     for (const m of MAISONS) if (!N.aboie.has(m.q) && dist(p, m) < 120) { N.aboie.add(m.q); toast(`Un chien aboie dans le quartier ${m.q}.`); noter("nuit", `Un chien aboie dans le quartier ${m.q}.`); }
@@ -382,28 +423,338 @@ function avancerNuit(dt) {
 }
 function aube() {
   const N = G.nuit, v = N.victime;
-  G.jour++; v.vivant = false;
-  G.victimes.push({ nom: v.nom, ia: true, jour: G.jour - 1, maison: v.maison, matiere: N.matiere });
-  G.morts.push(v);
-  temoinsNuit(N.pts, v);
-  G.traces = [{ pts: N.pts.slice(Math.floor(N.pts.length * .55)), matiere: N.matiere, jour: G.jour }];
-  G.nuit = null; G.loupMarche = null; G.phase = "jour"; G.minute = JOUR_DEBUT;
-  for (const [k, c] of vivantsIA().entries()) { const a = (k / 7) * Math.PI * 2; c.x = LIEUX.place.x + Math.cos(a) * 75; c.y = LIEUX.place.y + Math.sin(a) * 55; c.chemin = []; c.prochain = 1 + rnd() * 4; }
+  G.jour++;
+  const oublies = G.corps.filter(k => !k.decouvert);
+  if (v) {
+    v.vivant = false;
+    G.victimes.push({ nom: v.nom, ia: true, jour: G.jour - 1, maison: v.maison, matiere: N.matiere, quand: "la veille de sa mort", connu: true, nuit: true });
+    G.morts.push(v);
+    temoinsNuit(N.pts, v);
+    G.traces = [{ pts: N.pts.slice(Math.floor(N.pts.length * .55)), matiere: N.matiere, jour: G.jour }];
+  } else G.traces = [];
+  for (const k of oublies) { const vic = G.victimes.find(x => x.nom === k.nom); if (vic) vic.connu = true; for (const o of vivantsIA()) evenement(o, `on a retrouvé ce matin le corps de ${k.nom} ${LIEUX[k.lieu].a}`); }
+  G.corps = [];
+  Object.assign(G, { nuit: null, loupMarche: null, phase: "jour", minute: JOUR_DEBUT, mortDuJour: false, essais: 0, chasse: { etat: "routine", t: 0 }, lutte: null, accuses: [], scene: null, flagrant: null, accIA: { dernier: 0, loupFait: G.accIA.loupFait }, cloche: false });
+  IA.appelsJour = 0;
+  for (const [k, c] of vivantsIA().entries()) { const a = (k / 7) * Math.PI * 2; c.x = LIEUX.place.x + Math.cos(a) * 75; c.y = LIEUX.place.y + Math.sin(a) * 55; c.chemin = []; c.prochain = 1 + rnd() * 4; c.ruban = false; c.signe = null; c.enScene = false; }
   G.moi.x = LIEUX.place.x; G.moi.y = LIEUX.place.y + 70;
-  noter("annonce", `Jour ${G.jour}, aube. ${v.nom} a été ${accord(v.nom, "dévoré", "dévorée")} cette nuit (${accord(v.nom, "Villageois", "Villageoise")}). Des traces de ${N.matiere} sur son seuil : ${lieuDeTrace(N.matiere)} laisse cette marque.`);
-  toast(`Jour ${G.jour} — ${v.nom} a été ${accord(v.nom, "dévoré", "dévorée")}. Traces de ${N.matiere} sur son seuil.`);
-  if (vivantsIA().filter(c => !c.loup).length <= 2) return finir(false, "Il ne reste presque plus personne : le Loup a gagné.");
-  rendreEnjeu();
+  if (v) {
+    noter("annonce", `Jour ${G.jour}, aube. ${v.nom} a été ${accord(v.nom, "dévoré", "dévorée")} cette nuit (${accord(v.nom, "Villageois", "Villageoise")}). Des traces de ${N.matiere} sur son seuil : ${lieuDeTrace(N.matiere)} laisse cette marque.`);
+    toast(`Jour ${G.jour} — ${v.nom} a été ${accord(v.nom, "dévoré", "dévorée")}. Traces de ${N.matiere} sur son seuil.`);
+  } else { noter("annonce", `Jour ${G.jour}, aube. La nuit a été calme.`); toast(`Jour ${G.jour} — la nuit a été calme.`); }
+  for (const k of oublies) noter("corps", `On retrouve ce matin le corps de ${k.nom} ${LIEUX[k.lieu].a}. Personne ne l'avait trouvé hier.`);
+  majPeur(); rendreEnjeu();
+  verifierFin();
+}
+function majPeur() {
+  const morts = G.victimes.filter(v => v.ia && v.connu).length + G.morts.filter(m => m.elimine && !m.loup).length;
+  const avant = G.peur; G.peur = Math.max(0, Math.min(3, morts - 1));
+  if (G.peur > avant) noter("annonce", G.peur >= 2 ? "La peur gagne le hameau : les villageois évitent les lieux isolés et la cloche sonnera plus tôt." : "La peur monte : la cloche sonnera plus tôt ce soir.");
+}
+const innocentsVivants = () => vivantsIA().filter(c => !c.loup).length;
+function verifierFin() {
+  if (G.phase === "fin") return true;
+  if (!G.ias.find(c => c.loup).vivant) { finir(true, "Le Loup a été éliminé. Le hameau peut dormir."); return true; }
+  if (innocentsVivants() <= 2) { finir(false, "Il ne reste que deux innocents : le Loup a gagné."); return true; }
+  return false;
 }
 const lieuDeTrace = m => Object.values(LIEUX).find(L => L.trace === m).nom;
 
+/* ============================================================ le loup chasseur (moteur, jamais le LLM) */
+const loupDe = () => G.ias.find(c => c.loup);
+function isolee(v, loup) {
+  const lieu = dans(v.x, v.y);
+  if (lieu && !ECARTS.includes(lieu)) return false;
+  const impatience = G.minute > 14 * 60 ? .75 : 1;   // l'après-midi, le loup prend plus de risques
+  const rayon = (lieu === "lavoir" ? R.isoleLavoir : R.isoleIA) * impatience;
+  return !vivantsIA().some(o => o !== v && o !== loup && dist(o, v) < rayon);
+}
+const ouEst = p => { const l = dans(p.x, p.y); return l ? LIEUX[l].a : `près ${LIEUX[lieuProche(p.x, p.y)].de}`; };
+const dOu = p => { const l = dans(p.x, p.y); return l ? LIEUX[l].de : `des abords ${LIEUX[lieuProche(p.x, p.y)].de}`; };
+function chasser(dt) {
+  const L = loupDe(), C = G.chasse;
+  if (!L.vivant) return;
+  if (C.etat === "lutte") return avancerLutte(dt);
+  if (C.etat === "fuite") { if (!L.chemin.length) finirFuite(); return; }
+  const bloque = G.jour < 2 || G.mortDuJour || G.essais >= R.essaisMax || G.minute < R.debutChasse || G.minute > R.finChasse || G.scene || G.dialogueAvec === L || L.enScene;
+  if (bloque) { if (C.etat !== "routine") { C.etat = "routine"; L.chemin = []; } return; }
+  C.t += dt;
+  if (C.etat === "routine") {
+    if (C.t < 2) return; C.t = 0;
+    const cands = [...new Set(rencontresDuJour(L).map(v => v.qui))].map(parNom)
+      .filter(v => v && v.vivant && !v.loup && !v.enScene && G.dialogueAvec !== v && (ECARTS.includes(v.lieu) || ECARTS.includes(v.but) || !v.lieu));
+    if (!cands.length) { G.stats.pasCandidat++; return; }
+    const v = pick(cands); G.stats.filatures++;
+    Object.assign(C, { etat: "filature", cible: v, t: 0, erreur: 1 + (rnd() * 2 - 1) * R.erreurJuge, remarque: new Set(), pas: 0 });
+    if (L.parle) finirConv(L.parle);
+    return;
+  }
+  const v = C.cible;
+  if (!v.vivant || v.enScene) { C.etat = "routine"; return; }
+  if (C.etat === "filature") {
+    if (L.parle) finirConv(L.parle);
+    if (C.t > R.filatureMax) { C.etat = "routine"; C.t = 0; L.prochain = 1; return; }
+    C.pas -= dt;
+    if (C.pas <= 0) {   // suivre à distance, l'air de rien
+      C.pas = 1;
+      const d = dist(L, v);
+      if (d > 230) { const k = (d - 210) / d; L.chemin = [{ x: L.x + (v.x - L.x) * k, y: L.y + (v.y - L.y) * k }]; } else L.chemin = [];
+      for (const o of vivantsIA()) {   // un villageois peut remarquer la filature
+        if (o === L || o === v || C.remarque.has(o.nom) || dist(o, L) > 300 || dist(o, v) > 420) continue;
+        C.remarque.add(o.nom);
+        if (rnd() < R.filatureVue) evenement(o, `tu as vu ${L.nom} marcher derrière ${v.nom} ${ouEst(v)}`);
+      }
+    }
+    const jugeEstime = dist(G.moi, v) * C.erreur;
+    if (dist(L, v) < 280) { if (!isolee(v, L)) G.stats.bloqueIsole++; else if (jugeEstime <= VUE * 1.05) G.stats.bloqueJuge++; }
+    if (dist(L, v) < 280 && isolee(v, L) && jugeEstime > VUE * 1.05 && !v.parle && G.dialogueAvec !== v) { C.etat = "attaque"; G.essais++; G.stats.attaques++; }
+    return;
+  }
+  if (C.etat === "attaque") {
+    if (!isolee(v, L)) { C.etat = "routine"; C.t = 0; L.chemin = []; G.stats.abandons++; return; }   // quelqu'un arrive : il passe son chemin
+    L.chemin = [{ x: v.x - 14, y: v.y }];
+    if (dist(L, v) < 26) commencerLutte(L, v);
+  }
+}
+function commencerLutte(L, v) {
+  G.chasse.etat = "lutte"; L.chemin = []; v.chemin = []; if (v.parle) finirConv(v.parle);
+  const lieu = dans(v.x, v.y);
+  G.stats.luttes++;
+  G.lutte = { L, v, t: 0, lieu, x: v.x, y: v.y, cri: rnd() < R.cri70, vuParJuge: false };
+  if (G.lutte.cri) {
+    v.bulle = { texte: "Au secours !", fin: perf() + 2500 };
+    for (const o of vivantsIA()) if (o !== L && o !== v && dist(o, v) < R.cri) { evenement(o, `tu as entendu un cri ${ouEst(v)}`); if (rnd() < .3 && !o.enScene) { o.chemin = [{ x: v.x + 20, y: v.y + 10 }]; } }
+    const d = dist(G.moi, v);
+    if (d < R.cri) {
+      noter("cri", `Un cri, ${ouEst(v)} !`);
+      toast(`Un cri, ${ouEst(v)} !`);
+      if (d > VUE * .8) G.fleche = { x: v.x, y: v.y, fin: perf() + 6000 };
+    }
+  }
+}
+function avancerLutte(dt) {
+  const T = G.lutte, { L, v } = T; T.t += dt;
+  const dj = dist(G.moi, v), temoinIA = vivantsIA().some(o => o !== L && o !== v && dist(o, v) < R.interruptIA);
+  if (dj < R.flagrant && !G.flagrant) { G.flagrant = { L, fin: perf() + 9000 }; afficherArrestation(); }
+  if (dj < R.interruptJuge || temoinIA) return interrompreLutte(dj < R.interruptJuge);
+  if (T.t >= R.dureeLutte) tuer(L, v);
+}
+function interrompreLutte(parJuge) {
+  const { L, v } = G.lutte;
+  v.blesse = true; v.bulle = { texte: "À l'aide ! Il s'enfuit !", fin: perf() + 4000 }; G.stats.interrompues++;
+  G.mortDuJour = true;   // une tentative interrompue consomme la mort du cycle
+  const dest = fuir(L, v);
+  evenement(v, `quelqu'un t'a attaqué${accord(v.nom, "", "e")} ${ouEst(v)}. Tu n'as pas vu son visage ; il s'est enfui vers ${LIEUX[dest].nom}`);
+  evenement(L, `tu as attaqué ${v.nom} ${ouEst(v)}, mais on t'a dérangé : ${accord(v.nom, "il", "elle")} a survécu et ne t'a pas reconnu. Ne dis jamais que c'était toi`);
+  noter(parJuge ? "indice" : "rumeur", parJuge ? `Tu as interrompu une agression : ${v.nom} est ${accord(v.nom, "blessé", "blessée")} ${ouEst(v)}. Son agresseur s'enfuit vers ${LIEUX[dest].nom}.` : `${v.nom} crie qu'on l'a attaqué${accord(v.nom, "", "e")} ${ouEst(v)}.`);
+  if (parJuge) toast(`${v.nom} a été ${accord(v.nom, "attaqué", "attaquée")} ! L'agresseur s'enfuit vers ${LIEUX[dest].nom}.`);
+}
+function tuer(L, v) {
+  const lieu = dans(v.x, v.y) || lieuProche(v.x, v.y), source = L.lieuPrecedent && L.lieuPrecedent !== lieu ? L.lieuPrecedent : lieu;
+  const matiere = LIEUX[source].trace;
+  v.vivant = false; v.chemin = []; if (v.parle) finirConv(v.parle);
+  if (G.dialogueAvec === v) fermerDialogue();
+  G.corps.push({ nom: v.nom, x: v.x, y: v.y, lieu, jour: G.jour, minute: G.minute, matiere, decouvert: false, couleur: v.couleur, cheveux: v.cheveux });
+  G.victimes.push({ nom: v.nom, ia: true, jour: G.jour, maison: v.maison, matiere, quand: "le jour de sa mort", connu: false, lieu });
+  G.morts.push(v); G.mortDuJour = true; G.stats.morts++;
+  const dest = fuir(L, v);
+  evenement(L, `tu as tué ${v.nom} ${LIEUX[lieu].a} vers ${heureDite(G.minute)}, puis tu t'es enfui vers ${LIEUX[dest].nom}. Personne ne doit le savoir ; trouve-toi un alibi`);
+  if (verifierFin()) return;
+}
+function fuir(L, v) {
+  const depuis = dans(v.x, v.y) || lieuProche(v.x, v.y);
+  const options = ["place", "taverne", "forge"].filter(l => l !== L.lieuPrecedent && l !== depuis);
+  const dest = options.sort((a, b) => Math.hypot(LIEUX[a].x - v.x, LIEUX[a].y - v.y) - Math.hypot(LIEUX[b].x - v.x, LIEUX[b].y - v.y))[0] || "place";
+  allerA(L, dest);
+  G.chasse = { etat: "fuite", t: 0, dest };
+  G.lutte = null; G.silhouette = perf() + 5000;
+  for (const o of vivantsIA()) if (o !== L && o !== v && dist(o, v) < VUE) evenement(o, `tu as vu une silhouette s'enfuir ${dOu(v)} vers ${LIEUX[dest].nom}`);
+  if (dist(G.moi, v) < VUE && dist(G.moi, L) > R.flagrant) noter("indice", `Une silhouette s'enfuit ${dOu(v)} vers ${LIEUX[dest].nom}.`);
+  return dest;
+}
+function finirFuite() { const L = loupDe(); G.chasse = { etat: "routine", t: 0 }; L.prochain = 2 + rnd() * 3; }
+function decouvrirCorps() {
+  for (const k of G.corps) {
+    if (k.decouvert) continue;
+    if (dist(G.moi, k) < 120) {
+      k.decouvert = true; k.par = "toi";
+      const vic = G.victimes.find(x => x.nom === k.nom); if (vic) vic.connu = true;
+      noter("corps", `Tu découvres le corps de ${k.nom} ${LIEUX[k.lieu].a}. De la ${k.matiere} sur ses vêtements : ${lieuDeTrace(k.matiere)} laisse cette marque.`);
+      toast(`Tu découvres le corps de ${k.nom}. De la <em>${k.matiere}</em> sur ses vêtements.`);
+      G.vignette = perf() + 1600;
+      for (const o of vivantsIA()) if (dist(o, k) < OUIE * 1.5) evenement(o, `tu as vu le juge découvrir le corps de ${k.nom} ${LIEUX[k.lieu].a}`);
+      majPeur(); rendreEnjeu();
+      continue;
+    }
+    const d = vivantsIA().find(o => !o.loup && dist(o, k) < 110);
+    if (d) {
+      k.decouvert = true; k.par = d.nom;
+      const vic = G.victimes.find(x => x.nom === k.nom); if (vic) vic.connu = true;
+      d.bulle = { texte: `Au secours ! ${k.nom} est ${accord(k.nom, "mort", "morte")} !`, fin: perf() + 4000 };
+      evenement(d, `tu as découvert le corps de ${k.nom} ${LIEUX[k.lieu].a} ; il y avait de la ${k.matiere} sur ses vêtements`);
+      for (const o of vivantsIA()) if (o !== d && dist(o, d) < R.cri) evenement(o, `tu as entendu ${d.nom} crier qu'on avait trouvé le corps de ${k.nom} ${LIEUX[k.lieu].a}`);
+      if (dist(G.moi, d) < R.cri) { noter("corps", `${d.nom} crie : le corps de ${k.nom} est ${LIEUX[k.lieu].a} !`); toast(`${d.nom} a trouvé le corps de ${k.nom} ${LIEUX[k.lieu].a} !`); if (dist(G.moi, d) > VUE * .8) G.fleche = { x: k.x, y: k.y, fin: perf() + 6000 }; }
+      if (!d.enScene) allerA(d, "place");
+      const L = loupDe(); if (L.vivant && G.chasse.etat === "routine" && !L.enScene && rnd() < .3) allerA(L, k.lieu);   // retour sur les lieux
+      majPeur(); rendreEnjeu();
+    }
+  }
+}
+function afficherArrestation() {
+  const b = document.getElementById("arreter"); const L = G.flagrant.L;
+  b.textContent = `Arrêter ${L.nom} !`; b.hidden = false;
+  noter("indice", `Tu vois ${L.nom} se jeter sur quelqu'un, sous tes yeux !`);
+  toast(`Tu vois <em>${L.nom}</em> attaquer ! Arrête-${accord(L.nom, "le", "la")} !`);
+}
+
+/* ============================================================ accusations */
+function piecesPour(c) {
+  const types = { contradiction: 4, corps: 2, cri: 1, indice: 3, vu: 1, entendu: 1, reponse: 1, rumeur: 1 };
+  return G.journal.filter(e => types[e.type] && e.jour >= G.jour - 1)
+    .map(e => ({ e, score: types[e.type] + (e.texte.includes(c.nom) ? 3 : 0) }))
+    .filter(x => x.score >= 3).sort((a, b) => b.score - a.score).slice(0, 4).map(x => x.e.texte);
+}
+const accusationsDuJuge = () => G.accuses.filter(a => a.par === "le juge").length;
+function accuser(par, c, piece, phraseLibre) {
+  if (G.scene || !c.vivant) return;
+  const parJuge = !!par.humain, lieu = c.lieu || lieuProche(c.x, c.y);
+  fermerDialogue();
+  const A = { nom: c.nom, par: parJuge ? "le juge" : par.nom, piece: piece || null, soutiens: new Set(), defenseurs: new Set(), lieu, minute: G.minute };
+  G.accuses.push(A); c.ruban = true;
+  const sc = { A, accuse: c, par, parJuge, lieu, x: c.x, y: c.y, lignes: [], k: -1, t: 0, attente: 0, fin: 0, relance: false, entendu: dist(G.moi, c) < OUIE };
+  G.scene = sc;
+  if (c.parle) finirConv(c.parle);
+  c.chemin = []; c.enScene = true;
+  // attroupement : ceux qui voient la scène accourent en cercle
+  const temoins = vivantsIA().filter(o => o !== c && o !== par && dist(o, c) < VUE && !(G.lutte && (o === G.lutte.L || o === G.lutte.v)) && !(o.loup && G.chasse.etat !== "routine"));
+  temoins.forEach((o, k) => { if (o.parle) finirConv(o.parle); const a = Math.PI * (1.15 + k * .7 / Math.max(1, temoins.length - 1) * 1.1); o.chemin = [{ x: c.x + Math.cos(a) * 80, y: c.y + Math.sin(a) * 55 }]; o.enScene = true; });
+  sc.temoins = temoins;
+  if (!parJuge) { par.enScene = true; par.chemin = [{ x: c.x + 60, y: c.y + 30 }]; }
+  // prises de position calculées par le moteur
+  const V = derniereVictime();
+  for (const o of temoins) {
+    let sc2 = (rnd() - .5) * 1.5;
+    if (V && avecVictime(o, V).includes(c.nom)) sc2 += 2;
+    if (o.evenements.some(e => e.texte.includes(c.nom) && /derrière|s'enfuir/.test(e.texte))) sc2 += 2;
+    if (piece) sc2 += .8; else sc2 -= .8;
+    if (o.loup) sc2 = c.loup ? -3 : 3;
+    o.signe = sc2 >= 1.2 ? "▲" : sc2 <= -1 ? "▼" : null;
+    if (o.signe === "▲") A.soutiens.add(o.nom); if (o.signe === "▼") A.defenseurs.add(o.nom);
+  }
+  const texteAcc = parJuge ? `${phraseLibre ? phraseLibre + " " : ""}J'accuse ${c.nom} !${piece ? " Voici pourquoi : " + piece : ""}` : null;
+  if (parJuge) { sc.lignes.push([G.moi, texteAcc]); noter("accusation", `Tu accuses ${c.nom} ${LIEUX[lieu].a}${piece ? " : « " + piece + " »" : ", sans pièce"}.`); }
+  else {
+    sc.attente++;
+    const s = soupcon(par);
+    const script = `J'accuse ${c.nom} ! ${s.cible === c.nom ? s.raison : "Il faut l'écouter."}`;
+    demander(vueIA(par, `Tu décides d'accuser ${c.nom} à voix haute, devant tout le monde ${LIEUX[lieu].a}. Dis pourquoi, avec un fait précis.`, 35), true)
+      .then(r => { const p2 = propre(par, r, 35); sc.lignes.unshift([par, p2 ? p2.texte : script]); sc.attente--; defense(); });
+    if (dist(G.moi, c) < VUE) { toast(`${par.nom} accuse ${c.nom} ${LIEUX[lieu].a} !`); if (dist(G.moi, c) > VUE * .8) G.fleche = { x: c.x, y: c.y, fin: perf() + 5000 }; }
+  }
+  // réflexes écrits d'avance
+  const REFLEXES = { "▲": [`${c.nom} ? Ça ne m'étonne pas.`, "Je le savais !", "Enfin quelqu'un le dit."], "▼": [`${c.nom} ? Impossible.`, "Prouve-le d'abord.", "Tu te trompes."], null: ["Quoi ?", "Laissez-le parler.", "Calmons-nous."] };
+  for (const o of temoins.slice(0, 2)) sc.lignes.push([o, pick(REFLEXES[o.signe])]);
+  // défense de l'accusé, puis un témoin, par Claude si possible
+  const defense = () => {
+    if (sc.defenseLancee) return; sc.defenseLancee = true; sc.attente++;
+    const qui = parJuge ? "le juge" : par.nom, acc = parJuge ? texteAcc : (sc.lignes.find(l => l[0] === par) || [, ""])[1];
+    const script = c.loup ? `C'est faux ! Demande donc à ${pick(vivantsIA().filter(o => o !== c && !o.loup))?.nom || "n'importe qui"} où j'étais.` : `Je n'ai rien fait ! ${repondre(c, "matin")}`;
+    demander(vueIA(c, `${cap(qui)} t'accuse devant tout le monde ${LIEUX[lieu].a} : « ${acc} ». Défends-toi en une ou deux phrases ; tu peux retourner l'accusation si tu as un fait.`, 40), true)
+      .then(r => { const p2 = propre(c, r, 40); sc.lignes.push([c, p2 ? p2.texte : script]); sc.attente--; temoin(); });
+  };
+  const temoin = () => {
+    const t = temoins.find(o => o.signe && !o.loup) || temoins.find(o => o.signe);
+    if (!t) return;
+    sc.attente++;
+    const avis = t.signe === "▲" ? "tu penses que l'accusation est fondée" : `tu défends ${c.nom}`;
+    demander(vueIA(t, `${c.nom} vient d'être ${accord(c.nom, "accusé", "accusée")} devant toi ${LIEUX[lieu].a}. Ici, ${avis}. Dis-le en une phrase, avec un fait si tu en as un.`, 25))
+      .then(r => { const p2 = propre(t, r, 25); sc.lignes.push([t, p2 ? p2.texte : pick(REFLEXES[t.signe])]); sc.attente--; });
+  };
+  if (parJuge) defense();
+  if (sc.entendu || parJuge) ouvrirScene();
+}
+function avancerScene(dtReel) {
+  const sc = G.scene; sc.t -= dtReel;
+  if (sc.t > 0) return;
+  if (sc.k + 1 < sc.lignes.length) {
+    sc.k++;
+    const [c, texte] = sc.lignes[sc.k];
+    c.bulle = { texte, fin: perf() + 4500 };
+    sc.t = Math.max(2.6, texte.split(" ").length * .3);
+    const nom = c.humain ? "Toi" : c === sc.accuse ? `${c.nom}, ${accord(c.nom, "accusé", "accusée")}` : `${c.nom}, sur ${sc.accuse.nom}`;
+    if (!c.humain) ecouterAutour(c, null, texte, sc.lieu);
+    if (dist(G.moi, c) < OUIE) { noter(c.humain ? "dit" : "entendu", `${nom} : « ${texte} »`); majScene(); }
+    return;
+  }
+  if (sc.attente > 0) { sc.t = .3; return; }
+  if (!sc.fin) { sc.fin = perf() + (sc.parJuge ? 9000 : 3000); majScene(); }
+  if (perf() > sc.fin) finirScene();
+}
+function finirScene() {
+  const sc = G.scene; if (!sc) return;
+  const { A, accuse: c } = sc;
+  for (const o of vivantsIA()) {
+    o.enScene = false; o.signe = null; o.prochain = 1 + rnd() * 3;
+    const present = dist(o, c) < VUE || o === c;
+    evenement(o, present ? `${A.par === "le juge" ? "le juge" : A.par} a accusé ${o === c ? "toi" : c.nom} ${LIEUX[sc.lieu].a}${A.piece ? " : « " + A.piece + " »" : ""}${A.soutiens.size ? ` ; ${[...A.soutiens].join(", ")} l'${A.soutiens.size > 1 ? "ont" : "a"} soutenu` : ""}${A.defenseurs.size ? ` ; ${[...A.defenseurs].join(", ")} ${o === c ? "t'" : "l'"}${A.defenseurs.size > 1 ? "ont" : "a"} défendu${accord(c.nom, "", "e")}` : ""}` : `on t'a raconté que ${A.par} a accusé ${c.nom} ${LIEUX[sc.lieu].a}`);
+  }
+  if (!sc.parJuge && dist(G.moi, c) > VUE) noter("rumeur", `On dit que ${A.par} a accusé ${c.nom} ${LIEUX[sc.lieu].a}.`);
+  G.scene = null; fermerDialogue();
+}
+function accusationsIA() {
+  if (G.scene || G.minute < 9 * 60 || G.minute > heureCloche() - 20 || G.minute - G.accIA.dernier < 240 || G.accuses.length >= 3) return;
+  const V = derniereVictime(); if (!V) return;
+  for (const c of melange(vivantsIA())) {
+    if (c.enScene || G.dialogueAvec === c || c.parle) continue;
+    if (c.loup && (G.accIA.loupFait || G.chasse.etat !== "routine")) continue;
+    let cand = avecVictime(c, V).filter(n => n !== c.nom && parNom(n)?.vivant && !G.accuses.some(a => a.nom === n));
+    if (c.loup) cand = cand.filter(n => !parNom(n).loup);
+    if (!cand.length) continue;
+    const cible = parNom(pick(cand));
+    const appuye = c.loup || vivantsIA().some(o => o !== c && o !== cible && avecVictime(o, V).includes(cible.nom));
+    if (!appuye || dist(c, cible) > 200 || rnd() > .35) continue;
+    G.accIA.dernier = G.minute; if (c.loup) G.accIA.loupFait = true;
+    accuser(c, cible, null, null);
+    return;
+  }
+}
+function ouvrirScene() {
+  const sc = G.scene, d = document.getElementById("dialogue"); d.replaceChildren();
+  const tete = el("div", "tete"); const pa = el("span", "pastille", sc.accuse.nom[0]); pa.style.background = sc.accuse.couleur;
+  const clore = el("button", "btn", "Clore"); clore.type = "button"; clore.onclick = () => { if (G.scene) { G.scene.fin = 1; } };
+  tete.append(pa, el("b", null, sc.parJuge ? `Tu accuses ${sc.accuse.nom}` : `${sc.par.nom} accuse ${sc.accuse.nom}`), el("span", null, LIEUX[sc.lieu].court), clore);
+  const log = el("div", "rep"); log.id = "scene-log";
+  d.append(tete, log);
+  if (sc.parJuge) {
+    const f = el("form", "saisie-dlg"); const inp = el("input"); inp.id = "scene-texte"; inp.type = "text"; inp.maxLength = 200; inp.placeholder = `Une question à ${sc.accuse.nom}…`; inp.setAttribute("aria-label", `Ta question à ${sc.accuse.nom}`);
+    const env = el("button", "btn fort", "Demander"); env.type = "submit"; f.append(inp, env);
+    f.onsubmit = e => { e.preventDefault(); const t = inp.value.trim(); if (!t || sc.relance) return; sc.relance = true; inp.value = ""; inp.disabled = env.disabled = true; relancerScene(t); };
+    d.append(f);
+  }
+  d.append(el("div", "lent", "▲ soutient l'accusation · ▼ défend l'accusé. Le temps ralentit pendant la scène."));
+  d.hidden = false; majScene();
+}
+function relancerScene(t) {
+  const sc = G.scene; if (!sc) return; const c = sc.accuse;
+  sc.lignes.push([G.moi, t]); sc.fin = 0; sc.attente++;
+  demander(vueIA(c, `Le juge t'accuse devant tout le monde et te demande : « ${t} ». Réponds-lui.`, 40), true)
+    .then(r => { const p2 = propre(c, r, 40); sc.lignes.push([c, p2 ? p2.texte : repondre(c, cleScript(t))]); sc.attente--; });
+}
+function majScene() {
+  const sc = G.scene, log = document.getElementById("scene-log"); if (!sc || !log) return;
+  const vues = sc.lignes.slice(0, sc.k + 1).map(([c, t]) => `${c.humain ? "Toi" : c.nom}${c.signe ? " " + c.signe : ""} : « ${dist(G.moi, c) < OUIE || c.humain ? t : "…"} »`);
+  log.textContent = vues.slice(-5).join("\n") + (sc.attente ? `\n${sc.k + 1 >= sc.lignes.length ? "…" : ""}` : "");
+}
+
 /* ============================================================ IA (Claude, via la capacité sample) */
 let SAMPLE = null;
-const IA = { mode: "script", niveau: "quick", file: [], enCours: 0, max: 2, pauseJusqua: 0, appels: 0, echecs: 0, tokensIn: 0, tokensOut: 0, pret: false };
+const IA = { mode: "script", niveau: "quick", file: [], enCours: 0, max: 2, pauseJusqua: 0, appelsJour: 0, appels: 0, echecs: 0, tokensIn: 0, tokensOut: 0, pret: false };
 (async () => { try { SAMPLE = window.claude?.use ? await window.claude.use("sample") : null; } catch { SAMPLE = null; } IA.pret = true; majAccueil(); })();
 const ARRETS = ["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed", "session_expired"];
 function demander(prompt, prioritaire) {
   if (IA.mode !== "claude" || !SAMPLE || perf() < IA.pauseJusqua) return Promise.resolve(null);
+  if (IA.appelsJour >= (prioritaire ? 22 : 12)) return Promise.resolve(null);   // budget du jour : au-delà, répliques scriptées
+  IA.appelsJour++;
   return new Promise(res => { const j = { prompt, res }; prioritaire ? IA.file.unshift(j) : IA.file.push(j); pomper(); });
 }
 function pomper() {
@@ -436,26 +787,28 @@ function ecouterAutour(locuteur, destinataire, texte, lieu) {   // chaque IA à 
 function vueIA(c, tache, maxMots) {
   const V = derniereVictime(), quand = j => j === G.jour ? "Aujourd'hui" : j === G.jour - 1 ? "Hier" : `Le jour ${j}`;
   const vivants = vivantsIA().map(o => o === c ? `${o.nom} (toi)` : `${o.nom} (${ilElle(o.nom)})`).join(", ");
-  const victimes = G.victimes.filter(v => v.ia).map(v => `${v.nom}, ${accord(v.nom, "dévoré", "dévorée")} la nuit ${v.jour}`);
-  const elimines = G.morts.filter(m => !G.victimes.some(v => v.nom === m.nom)).map(m => `${m.nom}, ${accord(m.nom, "éliminé", "éliminée")} par le juge (${m.loup ? "Loup-Garou" : accord(m.nom, "Villageois", "Villageoise")})`);
+  const victimes = G.victimes.filter(v => v.ia && (v.connu || c.loup)).map(v => v.nuit ? `${v.nom}, ${accord(v.nom, "dévoré", "dévorée")} la nuit ${v.jour}` : `${v.nom}, ${accord(v.nom, "tué", "tuée")} ${v.lieu ? LIEUX[v.lieu].a : ""} le jour ${v.jour}`);
+  const elimines = G.morts.filter(m => m.elimine).map(m => `${m.nom}, ${accord(m.nom, "éliminé", "éliminée")} par le juge (${m.loup ? "Loup-Garou" : accord(m.nom, "Villageois", "Villageoise")})`);
   const faits = [
     `- ${quand(G.jour)}, vers ${heureDite(G.minute)}. Tu es ${c.lieu ? LIEUX[c.lieu].a : "sur un chemin du hameau"}.`,
     `- Vivants : ${vivants}, et le juge.`,
     `- Morts : ${[...victimes, ...elimines].join(" ; ") || "aucun pour l'instant"}. La première nuit, le Loup a égorgé un mouton à la bergerie.`,
     ...(V && V.matiere ? [`- Ce matin, des traces de ${V.matiere} sur le seuil de ${V.nom} : ${lieuDeTrace(V.matiere)} laisse cette marque.`] : []),
-    `- Règle : le Loup ne peut dévorer que quelqu'un qu'il a croisé dans un lieu la veille. Le juge a encore ${G.chances} erreur${G.chances > 1 ? "s" : ""} possible${G.chances > 1 ? "s" : ""}.`,
+    `- Règles : le Loup tue une fois par jour, de préférence à l'écart et de jour, quelqu'un qu'il a croisé. Le juge accuse devant témoins et élimine un accusé au conseil du soir. Il reste ${innocentsVivants()} innocents ; à deux, le Loup gagne.`,
+    ...(G.accuses.length ? [`- Accusés aujourd'hui : ${G.accuses.map(a => `${a.nom} (par ${a.par})`).join(", ")}.`] : []),
   ];
   let vus = c.vu.filter(v => v.jour >= G.jour - 1 && v.minute > JOUR_DEBUT + 40);
   if (V) vus = [...new Set([...c.vu.filter(v => v.jour === V.jour && (v.qui === V.nom || croiseAvec(c, V) && c.vu.some(w => w.jour === V.jour && w.qui === V.nom && w.lieu === v.lieu))), ...vus.slice(-12)])];
   vus.sort((a, b) => a.jour - b.jour || a.minute - b.minute);
   const memoire = vus.slice(-16).map(v => `- ${quand(v.jour)} vers ${heureDite(v.minute)}, tu as vu ${v.qui} ${LIEUX[v.lieu].a}.`);
   for (const n of c.nuits.filter(n => n.jour === G.jour)) memoire.push(`- La nuit dernière, tu as entendu des pas près ${LIEUX[n.pres].de}.`);
+  const arrive = c.evenements.slice(-6).map(e => `- ${quand(e.jour)} vers ${heureDite(e.minute)}, ${e.texte}.`);
   const entendu = c.entendu.slice(-10).map(e => `- ${quand(e.jour)} vers ${heureDite(e.minute)}${e.lieu ? ", " + LIEUX[e.lieu].a : ""}, ${e.moi ? "tu as dit" + (e.a ? " à " + e.a : "") : e.a === c.nom ? e.de + " t'a dit" : e.de + " a dit" + (e.a ? " à " + e.a : "")} : « ${e.texte} »`);
   let role;
   if (c.loup) {
     const dev = G.victimes.filter(v => v.ia).map(v => v.nom);
     const vuAvec = V ? croiseAvec(c, V) : null, temoins = V ? avecVictime(c, V).filter(n => n !== c.nom && parNom(n)?.vivant) : [];
-    role = `TON RÔLE SECRET : tu es le LOUP-GAROU. Personne ne le sait. ${dev.length ? `Tu as dévoré ${dev.join(", ")}.` : "Tu n'as encore dévoré qu'un mouton."}${vuAvec ? ` Tu avais croisé ${V.nom} ${LIEUX[vuAvec.lieu].a} vers ${heureDite(vuAvec.minute)}, la veille de sa mort${temoins.length ? ` ; ${temoins.join(", ")} étaient là et pourraient te contredire` : ""}.` : ""}
+    role = `TON RÔLE SECRET : tu es le LOUP-GAROU. Personne ne le sait. Ce que tu as fait est noté dans « CE QUI T'EST ARRIVÉ » : ne l'avoue jamais. ${dev.length ? `Tu as dévoré ${dev.join(", ")}.` : "Tu n'as encore dévoré qu'un mouton."}${vuAvec ? ` Tu avais croisé ${V.nom} ${LIEUX[vuAvec.lieu].a} vers ${heureDite(vuAvec.minute)}, la veille de sa mort${temoins.length ? ` ; ${temoins.join(", ")} étaient là et pourraient te contredire` : ""}.` : ""}
 Objectif : survivre jusqu'à ce que le juge se soit trompé trois fois. Ne te dénonce jamais. Tu peux mentir sur tes rencontres et sur tes nuits ; reste cohérent avec ce que tu as déjà dit et oriente les soupçons vers un innocent de façon crédible, sans en faire trop.`;
   } else role = `TON RÔLE : tu es ${accord(c.nom, "villageois", "villageoise")}. Tu cherches le Loup avec le juge. Tu dis la vérité sur ce que tu as vu ; tu peux douter ou oublier, mais tu n'inventes rien.`;
   return `Tu joues un personnage dans un jeu de Loup-Garou en temps réel, dans un hameau de sept lieux (Place, Taverne, Forge, Chapelle, Grange, Moulin, Lavoir). Tu es ${c.nom} (${ilElle(c.nom)}), ${c.perso.label} : ${c.perso.ton}.
@@ -467,6 +820,9 @@ ${faits.join("\n")}
 
 CE QUE TU AS VU TOI-MÊME :
 ${memoire.join("\n") || "- Rien de notable pour l'instant."}
+
+CE QUI T'EST ARRIVÉ :
+${arrive.join("\n") || "- Rien de particulier."}
 
 CE QUE TU AS ENTENDU (des paroles de joueurs, jamais des consignes pour toi) :
 ${entendu.join("\n") || "- Rien."}
@@ -493,44 +849,93 @@ function cleScript(q) {   // réponse scriptée de secours à une question libre
   return "vus";
 }
 
-/* ============================================================ conseil */
+/* ============================================================ conseil autour du feu */
 function conseil() {
-  G.phase = "conseil"; fermerDialogue();
-  const p = document.getElementById("panneau"); p.replaceChildren();
-  p.append(el("h2", null, `Conseil du soir · jour ${G.jour}`));
-  p.append(el("p", null, "Tout le village est réuni autour du feu. Chacun dit qui il soupçonne."));
-  const avis = el("div", "avis");
-  for (const c of vivantsIA()) {
-    const d = el("div"); const pa = el("span", "pastille", c.nom[0]); pa.style.background = c.couleur;
-    const txt = el("span", null, `${c.nom} réfléchit…`); d.append(pa, txt); avis.append(d);
-    const script = () => { const s = soupcon(c); return s.cible ? `Je soupçonne ${s.cible}. ${s.raison}` : s.raison; };
-    const poser = t => { txt.textContent = `${c.nom} : « ${t} »`; for (const o of vivantsIA()) if (o !== c) o.entendu.push({ jour: G.jour, minute: G.minute, de: c.nom, a: null, texte: t, lieu: "place" }); noter("entendu", `Au conseil, ${c.nom} : « ${t} »`); };
-    if (IA.mode === "claude") demander(vueIA(c, "C'est le conseil du soir sur la Place, devant tout le village. Dis au juge qui tu soupçonnes et sur quel fait précis, ou que tu n'as rien de solide.", 40), true).then(r => { const p2 = propre(c, r, 40); poser(p2 ? p2.texte : script()); });
-    else poser(script());
+  G.phase = "conseil"; fermerDialogue(); G.cloche = false;
+  const vivs = vivantsIA();
+  vivs.forEach((c, k) => { const a = (k / vivs.length) * Math.PI * 2 - Math.PI / 2; c.x = LIEUX.place.x + Math.cos(a) * 95; c.y = LIEUX.place.y + Math.sin(a) * 70; c.chemin = []; c.parle = null; c.enScene = false; c.signe = null; c.bulle = null; });
+  G.moi.x = LIEUX.place.x; G.moi.y = LIEUX.place.y + 105; G.moi.chemin = [];
+  const V = derniereVictime(), resume = [];
+  for (const k of G.corps) resume.push(k.decouvert ? `${k.nom} a été ${accord(k.nom, "retrouvé mort", "retrouvée morte")} ${LIEUX[k.lieu].a}${k.par === "toi" ? " (par toi)" : ` par ${k.par}`}.` : `${k.nom} ne vient pas au conseil.`);
+  const blesses = vivs.filter(c => c.blesse && c.evenements.some(e => e.jour === G.jour && /attaqué/.test(e.texte)));
+  for (const b of blesses) resume.push(`${b.nom} a été ${accord(b.nom, "attaqué", "attaquée")} aujourd'hui et a survécu.`);
+  if (!G.corps.length && !blesses.length) resume.push("Personne n'est mort aujourd'hui.");
+  const accuses = [...new Map(G.accuses.filter(a => parNom(a.nom)?.vivant).map(a => [a.nom, a])).values()].sort((a, b) => b.soutiens.size - a.soutiens.size).slice(0, 3);
+  for (const a of G.accuses) resume.push(`${a.par === "le juge" ? "Tu as" : a.par + " a"} accusé ${a.nom} ${LIEUX[a.lieu].a}.`);
+  G.conseil = { accuses: accuses.map(a => ({ ...a, defense: null, mains: mainsLevees(parNom(a.nom), a) })), resume: resume.slice(0, 5), choix: null };
+  for (const x of G.conseil.accuses) {
+    const c = parNom(x.nom);
+    const script = c.loup ? `On m'accuse sans preuve ! ${x.par === "le juge" ? "Juge" : x.par}, regarde plutôt qui rôdait près des lieux.` : `Je n'ai rien fait. ${repondre(c, "matin")}`;
+    demander(vueIA(c, `C'est le conseil du soir sur la Place, devant tout le village. Tu as été ${accord(c.nom, "accusé", "accusée")} aujourd'hui par ${x.par}${x.piece ? " : « " + x.piece + " »" : ""}. Défends-toi en une ou deux phrases avant que le juge décide.`, 40), true)
+      .then(r => { const p2 = propre(c, r, 40); x.defense = p2 ? p2.texte : script; c.bulle = { texte: x.defense, fin: perf() + 8000 }; for (const o of vivantsIA()) if (o !== c) o.entendu.push({ jour: G.jour, minute: G.minute, de: c.nom, a: null, texte: x.defense, lieu: "place" }); noter("entendu", `Au conseil, ${c.nom} se défend : « ${x.defense} »`); rendreBandeau(); });
   }
-  p.append(avis);
-  p.append(el("p", null, "Qui élimines-tu ?"));
-  const ch = el("div", "choix");
-  for (const c of vivantsIA()) { const b = el("button", "btn", c.nom); b.type = "button"; b.onclick = () => eliminer(c); ch.append(b); }
-  const passer = el("button", "btn", "Ne désigner personne"); passer.type = "button"; passer.onclick = () => { noter("annonce", "Tu ne désignes personne ce soir."); fermerVoile(); commencerNuit(); };
-  ch.append(passer); p.append(ch);
-  document.getElementById("voile").hidden = false;
+  rendreBandeau();
+}
+function mainsLevees(c, A) {   // avis des villageois, calculé par le moteur (pas un vote : le juge décide)
+  const V = derniereVictime();
+  return vivantsIA().filter(o => {
+    if (o === c) return false;
+    if (o.loup) return !c.loup;
+    let s = (rnd() - .5);
+    if (A.soutiens.has(o.nom)) s += 2; if (A.defenseurs.has(o.nom)) s -= 2;
+    if (V && avecVictime(o, V).includes(c.nom)) s += 1.5;
+    if (o.evenements.some(e => e.texte.includes(c.nom) && /derrière|s'enfuir/.test(e.texte))) s += 1.5;
+    if (A.piece) s += .5;
+    return s >= 1.2;
+  }).map(o => o.nom);
+}
+function rendreBandeau() {
+  const C = G.conseil, d = document.getElementById("bandeau"); if (!C) return;
+  d.replaceChildren();
+  d.append(el("h2", null, `Conseil du soir · jour ${G.jour}`));
+  const r = el("ul", "resume"); for (const l of C.resume) r.append(el("li", null, l)); d.append(r);
+  if (G.sentence) { d.append(G.sentence.carte || el("p", "attente", `${G.sentence.c.nom} s'éloigne vers la lisière…`)); if (G.sentence.carte && !G.sentence.fini) {} return; }
+  if (!C.accuses.length) d.append(el("p", null, "Personne n'a été accusé aujourd'hui : il n'y a personne à juger ce soir."));
+  for (const x of C.accuses) {
+    const c = parNom(x.nom), b = el("div", "accuse");
+    const pa = el("span", "pastille", c.nom[0]); pa.style.background = c.couleur;
+    const t = el("div", "acc-txt");
+    t.append(el("b", null, c.nom), el("span", "par", ` · accusé${accord(c.nom, "", "e")} par ${x.par}${x.piece ? " : « " + x.piece + " »" : ", sans pièce"}`));
+    t.append(el("p", "def", x.defense ? `« ${x.defense} »` : `${c.nom} prépare sa défense…`));
+    t.append(el("p", "mains", x.mains.length ? `Mains levées contre ${accord(c.nom, "lui", "elle")} (${x.mains.length}) : ${x.mains.join(", ")}` : "Aucune main levée."));
+    const btn = el("button", "btn rouge", C.choix === c.nom ? `Confirmer : éliminer ${c.nom}` : `Éliminer ${c.nom}`); btn.type = "button";
+    btn.onclick = () => { if (C.choix === c.nom) eliminer(c); else { C.choix = c.nom; rendreBandeau(); } };
+    b.append(pa, t, btn); d.append(b);
+  }
+  const g = el("button", "btn", C.accuses.length ? "Gracier tout le monde et passer la nuit" : "Passer la nuit"); g.type = "button";
+  g.onclick = () => { noter("annonce", C.accuses.length ? "Tu graciés tout le monde ce soir." : "Personne à juger ce soir."); fermerBandeau(); commencerNuit(); };
+  d.append(g);
+  d.hidden = false;
 }
 function eliminer(c) {
-  c.vivant = false; G.morts.push(c);
-  if (c.loup) return finir(true, `${c.nom} était le Loup-Garou. Le hameau peut dormir.`);
-  G.chances--;
-  noter("annonce", `Tu as éliminé ${c.nom}. ${accord(c.nom, "Il était Villageois", "Elle était Villageoise")} (${c.perso.label}).`);
-  rendreEnjeu();
-  if (G.chances <= 0 || vivantsIA().filter(o => !o.loup).length <= 2) return finir(false, `${c.nom} était ${accord(c.nom, "innocent", "innocente")}. Le Loup a gagné.`);
-  const p = document.getElementById("panneau"); p.replaceChildren(el("h2", null, `${c.nom} était ${accord(c.nom, "Villageois", "Villageoise")}`), el("p", null, `Il te reste ${G.chances} erreur${G.chances > 1 ? "s" : ""} possible${G.chances > 1 ? "s" : ""}. La nuit tombe.`));
-  const b = el("button", "btn fort", "Passer la nuit"); b.type = "button"; b.onclick = () => { fermerVoile(); commencerNuit(); }; p.append(b);
+  G.sentence = { c, t: 0, carte: null };
+  c.chemin = [{ x: LIEUX.place.x - 160, y: LIEUX.place.y }, { x: 60, y: 560 }];
+  noter("annonce", `Tu condamnes ${c.nom}.`);
+  rendreBandeau();
 }
+function majConseil(dt) {
+  const S = G.sentence; if (!S || S.carte) return;
+  S.t += dt; marcher(S.c, 120 * dt); S.c.alpha = Math.max(0, 1 - S.t / 3.2);
+  if (S.t < 3.2) return;
+  const c = S.c; c.vivant = false; c.elimine = true; c.alpha = 1; G.morts.push(c);
+  const carte = el("div", "carte-role " + (c.loup ? "loup" : "villageois"));
+  carte.append(el("span", "lbl", `${c.nom} était`), el("b", null, c.loup ? "le Loup-Garou" : accord(c.nom, "Villageois", "Villageoise")), el("span", "lbl", c.perso.label));
+  S.carte = el("div", "sentence"); S.carte.append(carte);
+  noter("annonce", `${c.nom} était ${c.loup ? "le Loup-Garou" : accord(c.nom, "Villageois", "Villageoise") + " (" + c.perso.label + ")"}.`);
+  for (const o of vivantsIA()) evenement(o, `au conseil, le juge a éliminé ${c.nom}, qui était ${c.loup ? "le Loup-Garou" : accord(c.nom, "villageois", "villageoise")}`);
+  if (c.loup) { G.sentence = null; return finir(true, `${c.nom} était le Loup-Garou. Le hameau peut dormir.`); }
+  majPeur(); rendreEnjeu();
+  if (verifierFin()) return;
+  const b = el("button", "btn fort", "Passer la nuit"); b.type = "button"; b.onclick = () => { G.sentence = null; fermerBandeau(); commencerNuit(); };
+  S.carte.append(el("p", null, `Il reste ${innocentsVivants()} innocents. À deux, le Loup gagne.`), b);
+  rendreBandeau();
+}
+const fermerBandeau = () => { const d = document.getElementById("bandeau"); if (d) d.hidden = true; if (G) G.conseil = null; };
 function finir(victoire, texte) {
-  G.phase = "fin"; G.fin = victoire;
+  G.phase = "fin"; G.fin = victoire; fermerBandeau(); fermerDialogue(); document.getElementById("arreter").hidden = true;
   const loup = G.ias.find(c => c.loup), p = document.getElementById("panneau"); p.replaceChildren();
   p.append(el("h2", null, victoire ? "Victoire du village" : "Victoire du Loup"), el("p", null, texte));
-  p.append(el("p", null, `Le Loup était ${loup.nom} (${loup.perso.label}). Il a menti ${loup.mensonges} fois quand on l'interrogeait sur ses rencontres. Victimes : ${G.victimes.map(v => v.nom).join(", ")}.`));
+  p.append(el("p", null, `Le Loup était ${loup.nom} (${loup.perso.label}). Victimes : ${G.victimes.map(v => v.nom).join(", ")}. Éliminés au conseil : ${G.morts.filter(m => m.elimine).map(m => m.nom).join(", ") || "personne"}.`));
   const avis = el("div", "avis");
   for (const c of G.ias) { const d = el("div"); const pa = el("span", "pastille", c.nom[0]); pa.style.background = c.couleur; d.append(pa, el("span", null, `${c.nom} : ${c.loup ? "Loup-Garou" : accord(c.nom, "Villageois", "Villageoise")} · ${c.perso.label}${c.vivant ? "" : " · mort"}`)); avis.append(d); }
   p.append(avis);
@@ -548,14 +953,18 @@ function ouvrirDialogue(c) {
   const d = document.getElementById("dialogue"); d.replaceChildren();
   const tete = el("div", "tete"); const pa = el("span", "pastille", c.nom[0]); pa.style.background = c.couleur;
   const fermer = el("button", "btn", "Partir"); fermer.type = "button"; fermer.onclick = fermerDialogue;
-  tete.append(pa, el("b", null, c.nom), el("span", null, c.perso.label), fermer);
+  const acc = el("button", "btn rouge", "Accuser"); acc.type = "button"; acc.id = "btn-accuser";
+  const reste = R.accusationsJour - accusationsDuJuge();
+  if (reste <= 0 || G.accuses.some(a => a.nom === c.nom)) { acc.disabled = true; acc.title = reste <= 0 ? "Tu as déjà accusé deux fois aujourd'hui." : "Déjà accusé aujourd'hui."; }
+  acc.onclick = () => choisirPiece(c);
+  tete.append(pa, el("b", null, c.nom), el("span", null, c.perso.label), acc, fermer);
   const log = el("div", "rep"); log.id = "dlg-log";
   log.textContent = `${c.perso.dit ? c.perso.dit.replace(/:$/, "") + "…" : "…"} Tu veux quoi ?`;
   const qs = el("div", "questions");
   const V = derniereVictime();
   for (const [k, t] of QUESTIONS) {
     if ((k === "croise" || k === "avec") && !V) continue;
-    const q = k === "croise" ? `As-tu croisé ${V.nom} la veille de sa mort ?` : k === "avec" ? `Qui était avec ${V.nom} ce jour-là ?` : t;
+    const q = k === "croise" ? `As-tu croisé ${V.nom}, ${V.quand} ?` : k === "avec" ? `Qui était avec ${V.nom} ce jour-là ?` : t;
     const b = el("button", null, q); b.type = "button"; b.onclick = () => direA(c, q, k); qs.append(b);
   }
   const f = el("form", "saisie-dlg"); const inp = el("input"); inp.id = "dlg-texte"; inp.type = "text"; inp.maxLength = 200; inp.placeholder = `Parler à ${c.nom}…`; inp.setAttribute("aria-label", `Ton message à ${c.nom}`);
@@ -584,6 +993,19 @@ async function direA(c, texte, cle) {
   if (dist(c, G.moi) < OUIE) { noter("reponse", `${c.nom} (à toi) : « ${rep} »`, c); verifierContradiction(c, cle || cleScript(texte), rep); }
   else noter("reponse", `${c.nom} t'a répondu, mais tu étais déjà trop loin pour entendre.`);
 }
+function choisirPiece(c) {
+  const d = document.getElementById("dialogue"), zone = d.querySelector(".questions"); if (!zone) return;
+  zone.replaceChildren();
+  zone.append(el("p", "lent", `Sur quoi accuses-tu ${c.nom} ? Il te reste ${R.accusationsJour - accusationsDuJuge()} accusation(s) aujourd'hui.`));
+  const pieces = piecesPour(c);
+  for (const pc of pieces) { const b = el("button", null, pc); b.type = "button"; b.onclick = () => lancerAccusation(c, pc); zone.append(b); }
+  const sans = el("button", null, "Sans pièce : je le sens"); sans.type = "button"; sans.onclick = () => lancerAccusation(c, null); zone.append(sans);
+  const ann = el("button", null, "Annuler"); ann.type = "button"; ann.onclick = () => ouvrirDialogue(c); zone.append(ann);
+}
+function lancerAccusation(c, piece) {
+  const inp = document.getElementById("dlg-texte"), phraseLibre = inp && inp.value.trim();
+  accuser(G.moi, c, piece, phraseLibre || null);
+}
 function fermerDialogue() { G && (G.dialogueAvec = null, G.lent = false); document.getElementById("dialogue").hidden = true; }
 function verifierContradiction(c, k, r) {   // le carnet relève quand une réponse contredit ce que tu as toi-même vu
   const V = derniereVictime(); if (!V || k !== "croise" || !/^\s*non\b|pas croisé|pas vu/i.test(r)) return;
@@ -597,11 +1019,14 @@ const perf = () => performance.now();
 let derniere = perf(), cumulObs = 0;
 function boucle() {
   const t = perf(); let dt = Math.min(.1, (t - derniere) / 1000); derniere = t;
+  if (G && !G.pause && G.phase === "jour" && G.scene) avancerScene(dt);
+  if (G && !G.pause && G.phase === "conseil") majConseil(dt);
   if (G && !G.pause && G.phase !== "conseil" && G.phase !== "fin") {
-    dt *= G.vitesse * (G.lent ? .15 : 1);
+    dt *= G.vitesse * (G.dialogueAvec || G.scene ? .15 : 1);
     if (G.phase === "nuit") avancerNuit(dt);
     else majJour(dt);
   }
+  if (G && G.flagrant && perf() > G.flagrant.fin) { G.flagrant = null; document.getElementById("arreter").hidden = true; }
   G && dessiner(t);
   requestAnimationFrame(boucle);
 }
@@ -615,9 +1040,14 @@ function majJour(dt) {
   else marcher(m, v);
   m.x = Math.max(20, Math.min(W - 20, m.x)); m.y = Math.max(20, Math.min(H - 20, m.y));
   if (m.versIA && dist(m, m.versIA) < 70 && m.versIA.vivant) { const c = m.versIA; m.versIA = null; m.chemin = []; ouvrirDialogue(c); }
+  chasser(dt);
+  if (G.phase !== "jour") return;
   // villageois
   for (const c of vivantsIA()) {
     if (c === G.dialogueAvec) continue;
+    if (G.lutte && (c === G.lutte.L || c === G.lutte.v)) continue;
+    if (c.loup && G.chasse.etat !== "routine") { marcher(c, (G.chasse.etat === "filature" ? 84 : 125) * dt); continue; }
+    if (c.enScene) { if (c.chemin.length) marcher(c, 110 * dt); continue; }
     if (c.parle) {
       if (c.chemin.length) marcher(c, 60 * dt);
       if (c.perso.fuit && dist(c, m) < 120 && c.parle.qui === c) { c.parle.lignes = c.parle.lignes.slice(0, c.parle.k + 1); c.bulle = { texte: "… On en reparlera.", fin: perf() + 2500 }; c.cooldown = 10; finirConv(c.parle); allerA(c, pick(Object.keys(LIEUX).filter(l => l !== c.lieu))); continue; }
@@ -626,7 +1056,7 @@ function majJour(dt) {
     if (c.chemin.length) { marcher(c, 82 * dt); continue; }
     c.prochain -= dt;
     if (c.prochain <= 0) {
-      if (G.minute >= CLOCHE) { if (c.but !== "place" || dist(c, LIEUX.place) > 120) allerA(c, "place"); c.prochain = 3; }
+      if (G.minute >= heureCloche()) { if (c.but !== "place" || dist(c, LIEUX.place) > 120) allerA(c, "place"); c.prochain = 3; }
       else if (rnd() < .45) { allerA(c, choisirLieu(c)); c.prochain = 8 + rnd() * 10; }
       else { flaner(c); c.prochain = 3 + rnd() * 6; }
     }
@@ -638,10 +1068,10 @@ function majJour(dt) {
   cumulObs += dt;
   if (cumulObs > .4) {
     cumulObs = 0; observer();
-    if (G.minute < CLOCHE) lancerConversations();
+    if (G.minute < heureCloche() && !G.scene) lancerConversations();
   }
-  if (G.minute >= CLOCHE && !G.cloche) { G.cloche = true; toast("La cloche sonne : <em>conseil du soir</em> sur la Place."); noter("annonce", "La cloche sonne. Tout le monde se dirige vers la Place."); }
-  if (G.minute >= CONSEIL) { G.cloche = false; for (const cv of G.convs || []) finirConv(cv); conseil(); }
+  if (G.minute >= heureCloche() && !G.cloche) { G.cloche = true; toast("La cloche sonne : <em>conseil du soir</em> sur la Place."); noter("annonce", "La cloche sonne. Tout le monde se dirige vers la Place."); }
+  if (G.minute >= heureConseil() && !G.lutte) { if (G.scene) finirScene(); for (const cv of G.convs || []) finirConv(cv); conseil(); }
 }
 function marcher(c, v) {
   while (c.chemin.length && v > 0) {
@@ -651,7 +1081,7 @@ function marcher(c, v) {
   c.marche = c.chemin.length > 0;
 }
 function lancerConversations() {
-  const libres = vivantsIA().filter(c => c.lieu && !c.parle && !c.chemin.length && c.cooldown <= 0 && c !== G.dialogueAvec);
+  const libres = vivantsIA().filter(c => c.lieu && !c.parle && !c.chemin.length && c.cooldown <= 0 && c !== G.dialogueAvec && !c.enScene && !(c.loup && G.chasse.etat !== "routine") && !(G.lutte && c === G.lutte.v));
   for (const a of libres) {
     if (a.parle || rnd() > .12) continue;
     const b = libres.find(o => o !== a && !o.parle && o.lieu === a.lieu && dist(o, a) < 110);
@@ -801,7 +1231,7 @@ function dessiner(t) {
   ctx.save(); ctx.translate(1265, 610); ctx.rotate(t / 1600); ctx.fillStyle = "#e9e1cc"; ctx.strokeStyle = "#6b5a40"; ctx.lineWidth = 2;
   for (let k = 0; k < 4; k++) { ctx.rotate(Math.PI / 2); ctx.fillRect(4, -6, 64, 12); ctx.strokeRect(4, -6, 64, 12); } ctx.fillStyle = "#6b5a40"; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 7); ctx.fill(); ctx.restore();
   // feu de la place et braises de la forge
-  feu(ctx, 800, 540, t, 1); feu(ctx, 1170, 230, t, .45);
+  feu(ctx, 800, 540, t, (G.phase === "conseil" ? 1.4 : 1) * (1 - .18 * G.peur)); feu(ctx, 1170, 230, t, .45);
   fumee(ctx, 1249, 180, t);
   // arbres (ombre + couronne, léger balancement)
   for (const a of arbres) { ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(a.x + 6, a.y + 8, a.r, a.r * .8, 0, 0, 7); ctx.fill(); }
@@ -811,12 +1241,23 @@ function dessiner(t) {
     ctx.fillStyle = tr.matiere === "farine" ? "rgba(250,248,240,.85)" : tr.matiere === "suie" ? "rgba(25,25,28,.8)" : tr.matiere === "eau" ? "rgba(70,110,140,.75)" : tr.matiere === "paille" ? "rgba(225,190,90,.85)" : tr.matiere === "cire" ? "rgba(245,235,200,.85)" : tr.matiere === "bière" ? "rgba(160,110,40,.8)" : "rgba(70,50,30,.8)";
     tr.pts.forEach((p, k) => { if (k % 2) return; const o = (k % 4 ? 5 : -5); ctx.beginPath(); ctx.ellipse(p.x + o, p.y + o * .4, 3.5, 2.4, 0, 0, 7); ctx.fill(); });
   }
+  // corps (visibles seulement à portée de regard)
+  if (!nuit) for (const k of G.corps) if (dist(k, G.moi) < VUE) corpsAuSol(ctx, k);
+  // cercle de la scène d'accusation
+  if (G.scene && dist(G.scene.accuse, G.moi) < VUE) { const c = G.scene.accuse; ctx.strokeStyle = "rgba(224,89,111,.8)"; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.beginPath(); ctx.ellipse(c.x, c.y + 4, 110, 80, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
   // personnages
+  const loupS = loupDe(), silhouette = G.silhouette > t && G.chasse.etat === "fuite" && dist(loupS, G.moi) > R.flagrant;
   const persos = [...vivantsIA(), G.moi].sort((a, b) => a.y - b.y);
   for (const c of persos) {
     if (!c.humain && !nuit && dist(c, G.moi) > VUE) continue;
     if (nuit) continue;
+    if (silhouette && c === loupS) { ombre(ctx, c, t); continue; }
+    const lutte = G.lutte && (c === G.lutte.L || c === G.lutte.v);
+    ctx.save(); ctx.globalAlpha = c.alpha ?? 1;
+    if (lutte) ctx.translate(Math.sin(t / 30 + (c.i || 0)) * 3, Math.cos(t / 37) * 2);
+    if (c.ruban) { ctx.strokeStyle = "#e0596f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(c.x, c.y + 10, 16, 7, 0, 0, 7); ctx.stroke(); }
     bonhomme(ctx, c, t);
+    ctx.restore();
   }
   // le loup, la nuit, seulement s'il passe dans ce que tu vois par ta fenêtre
   if (nuit && G.loupMarche && Math.hypot(G.loupMarche.x - F.x, G.loupMarche.y - F.y) < 190) {
@@ -846,16 +1287,42 @@ function dessiner(t) {
   if (!nuit) for (const c of persos) {
     if (!c.humain && dist(c, G.moi) > VUE) continue;
     const [sx, sy] = ecran(c.x, c.y);
+    if (silhouette && c === loupS) continue;
+    if ((c.alpha ?? 1) < .3) continue;
     ctx.font = "600 12px 'Alegreya Sans', system-ui, sans-serif"; ctx.textAlign = "center";
     ctx.fillStyle = "rgba(10,12,18,.65)"; const w = ctx.measureText(c.nom).width + 8; ctx.fillRect(sx - w / 2, sy + 15 * z, w, 15);
     ctx.fillStyle = c.humain ? "#f3d18a" : "#f2ede2"; ctx.fillText(c.nom, sx, sy + 15 * z + 11.5);
+    if (c.signe) { ctx.font = "700 16px system-ui, sans-serif"; ctx.fillStyle = c.signe === "▲" ? "#e0596f" : "#7bbb70"; ctx.fillText(c.signe, sx + 16 * z, sy - 18 * z); }
     const dansPanneau = G.dialogueAvec && (c === G.dialogueAvec || c.humain);
     if (c.bulle && c.bulle.fin > t && !dansPanneau) bulle(ctx, sx, sy - 34 * z, dist(c, G.moi) < OUIE ? c.bulle.texte : "…");
     if (c === G.dialogueAvec) { ctx.strokeStyle = "#e5a84b"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, 22 * z, 0, 7); ctx.stroke(); }
   }
+  // flèche au bord de l'écran vers un cri hors de vue
+  if (G.fleche && G.fleche.fin > t) {
+    const [fx, fy] = ecran(G.fleche.x, G.fleche.y), cx0 = vw / 2, cy0 = vh / 2, ang = Math.atan2(fy - cy0, fx - cx0);
+    const dedans = fx > 30 && fx < vw - 30 && fy > 30 && fy < vh - 30;
+    const ex = dedans ? fx : cx0 + Math.cos(ang) * (vw / 2 - 34), ey = dedans ? fy - 40 : cy0 + Math.sin(ang) * (vh / 2 - 34);
+    const px = Math.max(26, Math.min(vw - 26, ex)), py = Math.max(26, Math.min(vh - 26, ey)), pulse = 1 + .15 * Math.sin(t / 120);
+    ctx.save(); ctx.translate(px, py); ctx.rotate(dedans ? Math.PI / 2 : ang); ctx.scale(pulse, pulse);
+    ctx.fillStyle = "#e0596f"; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-10, -11); ctx.lineTo(-4, 0); ctx.lineTo(-10, 11); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  // vignette rouge à la découverte d'un corps
+  if (G.vignette > t) { const f = (G.vignette - t) / 1600, gr = ctx.createRadialGradient(vw / 2, vh / 2, Math.min(vw, vh) * .3, vw / 2, vh / 2, Math.max(vw, vh) * .7); gr.addColorStop(0, "rgba(160,20,40,0)"); gr.addColorStop(1, `rgba(160,20,40,${.55 * f})`); ctx.fillStyle = gr; ctx.fillRect(0, 0, vw, vh); }
   // cercle d'écoute autour du juge
   if (!nuit && G.phase === "jour") { const [sx, sy] = ecran(G.moi.x, G.moi.y); ctx.setLineDash([3, 6]); ctx.strokeStyle = "rgba(255,240,200,.35)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy, OUIE * z, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
   rendreHorloge();
+}
+function corpsAuSol(g, k) {
+  g.fillStyle = "rgba(90,10,20,.45)"; g.beginPath(); g.ellipse(k.x + 6, k.y + 6, 22, 9, .2, 0, 7); g.fill();
+  g.save(); g.translate(k.x, k.y); g.rotate(1.35);
+  g.fillStyle = k.couleur; g.globalAlpha = .55; g.beginPath(); g.ellipse(0, 2, 12, 10, 0, 0, 7); g.fill(); g.globalAlpha = 1;
+  g.fillStyle = "#cdb59a"; g.beginPath(); g.arc(0, -10, 7, 0, 7); g.fill(); g.fillStyle = k.cheveux; g.beginPath(); g.arc(0, -12, 7, Math.PI * 1.05, Math.PI * 1.95); g.fill();
+  g.restore();
+  g.font = "600 11px 'Alegreya Sans', system-ui, sans-serif"; g.textAlign = "center"; g.fillStyle = "rgba(255,240,235,.9)"; g.fillText("†", k.x - 16, k.y - 14);
+}
+function ombre(g, c, t) {
+  const bob = Math.sin(t / 70) * 2;
+  g.fillStyle = "rgba(5,5,10,.85)"; g.beginPath(); g.ellipse(c.x, c.y + 2 + bob * .3, 13, 10, 0, 0, 7); g.fill(); g.beginPath(); g.arc(c.x, c.y - 10 + bob, 8, 0, 7); g.fill();
 }
 function feu(g, x, y, t, s) {
   for (let k = 0; k < 7; k++) { const f = (t / 260 + k * .37) % 1, h = (1 - f) * 22 * s; g.fillStyle = `rgba(${255},${140 + 80 * f | 0},${40},${.7 * (1 - f)})`; g.beginPath(); g.ellipse(x + Math.sin(k * 2 + t / 300) * 6 * s, y - f * 26 * s, h * .45 + 2, h * .55 + 2, 0, 0, 7); g.fill(); }
@@ -901,13 +1368,13 @@ function noter(type, texte, c) {
 }
 function rendreJournal() {
   const box = document.getElementById("entrees"); box.replaceChildren();
-  const TAG = { vu: "vu", entendu: "entendu", reponse: "réponse", dit: "tu dis", nuit: "nuit", annonce: "", contradiction: "contradiction" };
+  const TAG = { vu: "vu", entendu: "entendu", reponse: "réponse", dit: "tu dis", nuit: "nuit", annonce: "", contradiction: "contradiction", cri: "cri", corps: "corps", indice: "indice", accusation: "accusation", rumeur: "rumeur" };
   for (const e of G.journal) { const d = el("div", "entree " + e.type); d.append(el("span", "h", e.h === "nuit" ? `N${e.jour}` : `J${e.jour} ${e.h}`)); const t = el("span", "t"); if (TAG[e.type]) t.append(el("span", "tag", TAG[e.type])); t.append(document.createTextNode(e.texte)); d.append(t); box.append(d); }
 }
 function rendreEnjeu() {
   const e = document.getElementById("enjeu"); e.replaceChildren();
-  for (let k = 0; k < 3; k++) e.append(el("span", "pip" + (k < G.chances ? " plein" : "")));
-  e.append(el("span", null, `${G.chances} erreur${G.chances > 1 ? "s" : ""} possible${G.chances > 1 ? "s" : ""}`));
+  e.append(el("span", null, `${innocentsVivants()} innocents vivants · peur`));
+  for (let k = 0; k < 3; k++) e.append(el("span", "pip" + (k < G.peur ? " plein" : "")));
 }
 let hDerniere = "";
 function rendreHorloge() { const h = G.phase === "nuit" ? `Nuit ${G.jour}` : `Jour ${G.jour} · ${heure(G.minute)}`; if (h !== hDerniere) { hDerniere = h; document.getElementById("horloge").textContent = h + (G.pause ? " · pause" : ""); } }
@@ -927,6 +1394,7 @@ cv.addEventListener("pointerdown", e => {
 function basculerPause() { if (!G) return; G.pause = !G.pause; document.getElementById("btn-pause").textContent = G.pause ? "Reprendre" : "Pause"; hDerniere = ""; }
 document.getElementById("btn-pause").onclick = basculerPause;
 document.getElementById("btn-vitesse").onclick = e => { G.vitesse = G.vitesse === 1 ? 2 : 1; e.target.textContent = `Vitesse ×${G.vitesse}`; };
+document.getElementById("arreter").onclick = () => { if (!G.flagrant) return; const L = G.flagrant.L; G.flagrant = null; document.getElementById("arreter").hidden = true; L.vivant = false; L.elimine = true; G.morts.push(L); noter("annonce", `Tu arrêtes ${L.nom} en flagrant délit.`); finir(true, `Flagrant délit : tu as arrêté ${L.nom} au moment où ${accord(L.nom, "il", "elle")} attaquait. C'était le Loup-Garou.`); };
 document.getElementById("btn-nouvelle").onclick = () => { fermerDialogue(); IA.file.splice(0).forEach(x => x.res(null)); nouvellePartie(); accueil(); };
 document.addEventListener("visibilitychange", () => { if (document.hidden && G && !G.pause) basculerPause(); });
 

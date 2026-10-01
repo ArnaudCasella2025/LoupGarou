@@ -48,3 +48,47 @@ Retour du joueur sur la v1 : « ça me paraît top, faut brancher les IA ». Mê
 - Garde-fous : JSON lu tolérant, texte tronqué au-delà de la limite, réplique du loup qui se dénonce rejetée, remplacement scripté en cas d'échec ; compteur d'appels et de tokens dans l'écran de fin.
 
 Vérifié avec un faux Claude (Playwright) : dialogue libre, conversations, conseil, aucune erreur ; mode scripté jour → conseil → nuit → aube sur ordinateur et téléphone. Non vérifié : comportement réel des modèles (à juger en jouant).
+
+### Prototype temps réel v3 : lots A et B du GDD temps réel (03/10)
+
+Même artefact, version 3. Référence : `design/gdd-temps-reel.md`.
+
+**Lot B, le loup chasseur** (moteur, jamais le LLM) :
+- **États :** routine → filature → attaque → lutte → fuite → alibi.
+- **Conditions d'attaque :** cible croisée dans la journée, seule dans un lieu à l'écart ou sur un chemin, personne à moins de 200 (150 au Lavoir ; × 0,75 l'après-midi, par impatience), juge estimé hors de vue (erreur ± 15 %). Entre 9h et 17h45, jamais le jour 1, 2 essais par jour.
+- **Lutte (3,5 s) :**
+  - cri dans 70 % des cas, entendu à 340, avec une flèche au bord de l'écran si c'est hors de vue ;
+  - quelques villageois accourent ;
+  - interruption si le juge passe à moins de 360 ou un villageois à moins de 120 : la victime survit, blessée, et devient témoin ;
+  - le juge à moins de 165 peut arrêter le loup : flagrant délit, victoire.
+- **Mort :**
+  - corps couché, à découvrir (vignette rouge) ;
+  - matière du dernier lieu traversé sur les vêtements ;
+  - silhouette en fuite pour les témoins, sans nom ;
+  - retour sur les lieux à 30 %.
+- **Nuit :** elle ne sert plus que de repli si le loup n'a pas tué de jour ; elle est calme sinon. Un corps non découvert est retrouvé à l'aube.
+
+**Lot A, accuser et éliminer :**
+- **Accusation par le juge :** bouton Accuser dans le dialogue, 2 par jour, avec une pièce proposée par le carnet. Scène :
+  - attroupement ;
+  - prises de position ▲/▼ calculées par le moteur ;
+  - réflexes écrits d'avance ;
+  - défense de l'accusé et un témoin, écrits par Claude ;
+  - une question de relance.
+  Ruban rouge jusqu'au soir.
+- **Accusation par les IA :** au plus une par demi-journée, uniquement sur un fait concret appuyé par une autre voix ; une seule par partie pour le loup.
+- **Conseil autour du feu** (bandeau, plus de panneau plein écran) :
+  - résumé du soir ;
+  - accusés du jour (3 au plus), chacun avec sa défense écrite par Claude et les mains levées calculées (un avis, pas un vote) ;
+  - élimination en deux clics : le condamné marche vers la lisière, puis une carte révèle son rôle ;
+  - ou gracier tout le monde.
+- **Fin de partie :** le compteur de 3 erreurs est supprimé ; défaite à 2 innocents vivants. La peur (0 à 3) avance la cloche, regroupe les villageois et baisse le feu.
+- **Mémoire des IA :** nouvelle rubrique « CE QUI T'EST ARRIVÉ » (cri, corps, filature remarquée, silhouette, accusations, rumeurs, éliminations). Le loup y voit ses propres actes, à ne jamais avouer.
+- **Budget Claude :** 12 appels ordinaires et 22 prioritaires par jour au plus, puis répliques scriptées.
+
+**Vérifications :**
+- **Parties automatiques :** 3 en mode scripté et 1 avec un faux Claude, de bout en bout (accusation, conseil, sentence, nuit, victoire et défaite), sans erreur.
+- **Équilibrage, mesuré sur 5 parties avec un juge qui se promène :** environ 2 morts sur 3 de jour, parfois une victime qui survit.
+- **Captures :** lutte vue de loin, silhouette, corps, conseil, carte de rôle.
+
+**Non vérifié :** répliques des vrais modèles pendant les scènes ; lot C (indices et rumeurs complets) et lot D (mise en scène) restent à faire.

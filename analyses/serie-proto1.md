@@ -15,7 +15,7 @@ Règle : 5 parties d'affilée sans modifier prompts ni règles. Si un critère �
 
 | # | Date | IA | Résultat | Jour | Élim. utilisées | Appels (relances) | Tokens entrée | Indice vers le loup | Faits faux | Note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 01/10 | rapides (supposé) | Victoire | 3 | 2/3 (J1 passé) | 65 (5 = 7,7 %) | ~261 k | Visions de Marc (Hugo, Camille innocents) + neutralité de Julien | 3-4 | ? |
+| 1 | 01/10 | rapides | Victoire | 3 | 2/3 (J1 passé) | 65 (5 = 7,7 %) | ~261 k | Visions de Marc (Hugo, Camille innocents) + neutralité de Julien | 3-4 | 6/10 |
 
 ## Partie 1 — notes
 
@@ -33,3 +33,7 @@ Observations (sans correction, version figée) :
 - La Voyante pousse publiquement contre une innocente sans vision sur elle.
 - Revendications « villageois » en masse quand le juge demande un tour de table des rôles (bruit sans gravité).
 - Positif : la règle de neutralité (correction de la partie 4) a désigné le loup ; la Voyante a survécu en ne se révélant qu'au juge ; « passer la journée » utilisé à bon escient.
+
+Retour du joueur : « Hormis la Voyante, les IA ne m'aident pas beaucoup, c'est difficile les premiers tours. Avec la Voyante les chances de réussite sont de 100 %, sans elle de 0 %. »
+Analyse : les 4 victoires (parties 02 à 05) reposent toutes sur la Voyante ; aucune partie sans Voyante depuis les améliorations. Hypothèses : (1) Voyante trop forte car ses messages privés au juge sont sans risque (invisibles, même comme aparté) ; (2) sans Voyante, peu de signal : les IA villageoises n'ont pas plus d'information que le juge.
+Prochaine partie : sans Voyante, même version figée, pour mesurer.

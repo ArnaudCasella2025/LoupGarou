@@ -1,0 +1,66 @@
+{
+  "note": "Données d'exemple du jalon J0 : trois projections figées, telles que projection(S, juge) les produira au jalon J1. Aucune partie réelle.",
+  "joueurs": [
+    { "nom": "Arnaud", "humain": true, "maison": "o1" },
+    { "nom": "Marc", "slot": 0, "perso": "sceptique cynique", "maison": "e4" },
+    { "nom": "Léa", "slot": 1, "perso": "naïf optimiste", "maison": "o3" },
+    { "nom": "Hugo", "slot": 2, "perso": "paranoïaque", "maison": "o2" },
+    { "nom": "Camille", "slot": 3, "perso": "discret et laconique", "maison": "e1" },
+    { "nom": "Thomas", "slot": 4, "perso": "émotif", "maison": "o4" },
+    { "nom": "Sophie", "slot": 5, "perso": "meneur autoritaire", "maison": "e2" },
+    { "nom": "Nicolas", "slot": 6, "perso": "bavard sympathique", "maison": "e3" }
+  ],
+  "scenes": {
+    "aube": {
+      "jour": 2, "moment": "aube", "enjeu": { "restantes": 3, "total": 3 }, "lieuJuge": "place",
+      "presents": { "place": ["Arnaud", "Marc", "Léa", "Hugo", "Camille", "Thomas", "Sophie"] },
+      "morts": [{ "nom": "Nicolas", "maison": "e3", "role": "Villageois", "cause": "dévoré la nuit dernière" }],
+      "traces": [
+        { "n": 1, "maison": "e3", "texte": "Farine sur le seuil de Nicolas : le Moulin laisse cette trace." },
+        { "n": 2, "lieu": "moulin", "texte": "Les chiens du quartier Est ont aboyé peu après minuit." }
+      ],
+      "bulles": [{ "nom": "Sophie", "texte": "De la farine chez Nicolas ? Qui est passé au Moulin hier ?" }],
+      "fil": [
+        { "type": "mj", "texte": "Jour 2, aube. Nicolas a été dévoré cette nuit (Villageois)." },
+        { "type": "mj", "texte": "Trace ① : de la farine sur son seuil. Trace ② : les chiens de l'Est ont aboyé." },
+        { "type": "parole", "de": "Sophie", "texte": "De la farine chez Nicolas ? Qui est passé au Moulin hier ?" },
+        { "type": "parole", "de": "Camille", "texte": "J'étais au Lavoir hier midi. J'ai vu Marc et Léa entrer au Moulin." }
+      ]
+    },
+    "midi": {
+      "jour": 2, "moment": "midi", "enjeu": { "restantes": 3, "total": 3 }, "lieuJuge": "forge",
+      "presents": { "forge": ["Arnaud", "Marc"] },
+      "vus": { "place": ["Léa", "Hugo", "Thomas"] },
+      "fantomes": [
+        { "nom": "Camille", "lieu": "lavoir", "depuis": "vue ce matin" },
+        { "nom": "Sophie", "lieu": "taverne", "depuis": "vue ce matin" }
+      ],
+      "morts": [{ "nom": "Nicolas", "maison": "e3", "role": "Villageois", "cause": "dévoré la nuit dernière" }],
+      "apartes": [["Léa", "Hugo", "place"]],
+      "bouches": ["place"],
+      "traces": [{ "n": 1, "maison": "e3", "texte": "Farine sur le seuil de Nicolas : le Moulin laisse cette trace." }],
+      "bulles": [{ "nom": "Marc", "texte": "Hier midi j'étais à la Taverne, pas au Moulin. Demande à Sophie." }],
+      "fil": [
+        { "type": "deplacement", "texte": "Tu vas à la Forge. Marc y est déjà." },
+        { "type": "loin", "texte": "Sur la Place, Léa et Hugo se parlent à l'écart." },
+        { "type": "parole", "de": "Marc", "texte": "Hier midi j'étais à la Taverne, pas au Moulin. Demande à Sophie." },
+        { "type": "vudit", "texte": "Vu / dit : Camille dit avoir vu Marc entrer au Moulin hier midi ; Marc dit qu'il était ailleurs." }
+      ]
+    },
+    "nuit": {
+      "jour": 2, "moment": "nuit", "enjeu": { "restantes": 2, "total": 3 }, "lieuJuge": null, "nuit": true,
+      "chezSoi": true,
+      "morts": [
+        { "nom": "Nicolas", "maison": "e3", "role": "Villageois", "cause": "dévoré la nuit 1" },
+        { "nom": "Thomas", "maison": "o4", "role": "Villageois", "cause": "éliminé au conseil" }
+      ],
+      "traces": [],
+      "bulles": [],
+      "fil": [
+        { "type": "mj", "texte": "Conseil du soir : tu as éliminé Thomas (Villageois)." },
+        { "type": "mj", "texte": "La nuit tombe. Chacun rentre chez soi." },
+        { "type": "loin", "texte": "Au loin, un chien aboie." }
+      ]
+    }
+  }
+}

@@ -1,0 +1,203 @@
+<title>Le Hameau du Loup-Garou</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : plan du hameau à gauche (≈ 58 %), chronique à droite ; au téléphone, plan collé en haut puis chronique. Tokens repris du proto 1. */
+:root {
+  --bg: #e7ebf0; --surface: #f5f7f9; --ink: #19212d; --muted: #5a6576; --line: #cbd3dd;
+  --blood: #9d2237; --candle: #a86a12; --soft: #dde3ea; --terre: #d3dae2; --nuit: #0b1020;
+  --c0: #b8531c; --c1: #2c6a99; --c2: #3a7234; --c3: #85499e; --c4: #8f6206; --c5: #17706b; --c6: #a1356a;
+  --f-display: "IM Fell English SC", "Iowan Old Style", Georgia, serif;
+  --f-body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d111a; --surface: #151b27; --ink: #e2e7ef; --muted: #8f9aac; --line: #283142;
+  --blood: #e0586f; --candle: #e2a64a; --soft: #1c2432; --terre: #121824; --nuit: #000308;
+  --c0: #ee8d55; --c1: #6aa8d8; --c2: #7bbb70; --c3: #bd8fd4; --c4: #e2b24f; --c5: #5cc3ba; --c6: #de77a6; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0d111a; --surface: #151b27; --ink: #e2e7ef; --muted: #8f9aac; --line: #283142;
+  --blood: #e0586f; --candle: #e2a64a; --soft: #1c2432; --terre: #121824; --nuit: #000308;
+  --c0: #ee8d55; --c1: #6aa8d8; --c2: #7bbb70; --c3: #bd8fd4; --c4: #e2b24f; --c5: #5cc3ba; --c6: #de77a6; color-scheme: dark }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.45 var(--f-body); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+
+.app { min-height: 100%; display: grid; grid-template-rows: auto 1fr; max-width: 1440px; margin: 0 auto; padding-inline: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding-block: 12px 10px; border-bottom: 1px solid var(--line); }
+h1 { font: 400 1.6rem/1 var(--f-display); margin: 0; letter-spacing: .02em; }
+.horloge { display: flex; align-items: center; gap: 10px; font: 500 .78rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.crans { display: inline-flex; gap: 4px; }
+.cran { width: 18px; height: 6px; border-radius: 3px; background: var(--soft); border: 1px solid var(--line); }
+.cran.passe { background: color-mix(in srgb, var(--candle) 45%, var(--soft)); }
+.cran.actuel { background: var(--candle); border-color: var(--candle); }
+.enjeu { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
+.pip { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--blood); display: inline-block; }
+.pip.plein { background: var(--blood); }
+.outils { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 4px 10px; font-size: .88rem; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 4px 10px; font-size: .88rem; }
+.btn[aria-pressed="true"] { border-color: var(--ink); }
+.etiquette-maquette { font: 500 .7rem var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--candle); }
+
+.corps { display: grid; grid-template-columns: minmax(0, 58fr) minmax(320px, 42fr); gap: 18px; padding-block: 14px; min-height: 0; }
+@media (max-width: 760px) { .corps { grid-template-columns: minmax(0, 1fr); } }
+
+.colonne-plan { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cadre { position: relative; background: var(--terre); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+@media (max-width: 760px) { .cadre { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; } }
+.cadre svg { display: block; width: 100%; height: auto; }
+.calque { position: absolute; inset: 0; pointer-events: none; }
+
+/* plan */
+.chemins line { stroke: var(--line); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 1 12; }
+.lieu .zone { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.lieu { cursor: pointer; }
+.lieu:hover .zone, .lieu:focus-visible .zone { stroke: var(--muted); }
+.lieu:focus { outline: none; }
+.lieu:focus-visible .zone { stroke: var(--candle); stroke-width: 3; }
+.lieu.ici .zone { stroke: var(--candle); stroke-width: 3; fill: color-mix(in srgb, var(--candle) 9%, var(--surface)); }
+.lieu.brume .zone { fill: var(--soft); }
+.brume-trait { stroke: color-mix(in srgb, var(--muted) 28%, transparent); stroke-width: 3; }
+.lieu .picto path { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.lieu.ici .picto path { stroke: var(--candle); }
+.nom-lieu { font-family: var(--f-display); fill: var(--ink); }
+.lieu.brume .nom-lieu { fill: var(--muted); }
+.marque-ici { font-family: var(--f-mono); fill: var(--candle); letter-spacing: .06em; text-transform: uppercase; }
+.vues line, .vues path { stroke: var(--candle); stroke-width: 2; stroke-dasharray: 5 5; fill: none; stroke-linecap: round; }
+.vues path { stroke-dasharray: none; }
+.lisiere rect { fill: color-mix(in srgb, var(--c2) 14%, var(--terre)); }
+.lisiere .arbre { fill: color-mix(in srgb, var(--c2) 55%, var(--terre)); }
+.etiquette-lisiere { font-family: var(--f-display); fill: var(--muted); }
+.maison .toit { fill: var(--surface); stroke: var(--muted); stroke-width: 1.4; }
+.maison .fenetre { fill: var(--soft); stroke: var(--muted); stroke-width: 1; }
+.maison.allumee .fenetre { fill: var(--candle); }
+.maison .halo { fill: color-mix(in srgb, var(--candle) 22%, transparent); }
+.stele path { fill: var(--muted); }
+.stele text { fill: var(--surface); font-family: var(--f-body); font-weight: 700; }
+
+.jeton { cursor: pointer; }
+.jeton:focus { outline: none; }
+.jeton .corps { fill: var(--c); stroke: var(--surface); stroke-width: 2.5; }
+.jeton:focus-visible .corps { stroke: var(--candle); stroke-width: 4; }
+.jeton .initiale { fill: var(--surface); font: 700 1em var(--f-body); font-family: var(--f-body); pointer-events: none; }
+.jeton .nom-jeton { fill: var(--ink); font-family: var(--f-body); font-weight: 500; pointer-events: none; }
+.jeton.s0 { --c: var(--c0); } .jeton.s1 { --c: var(--c1); } .jeton.s2 { --c: var(--c2); } .jeton.s3 { --c: var(--c3); }
+.jeton.s4 { --c: var(--c4); } .jeton.s5 { --c: var(--c5); } .jeton.s6 { --c: var(--c6); }
+.jeton.humain .corps { fill: var(--surface); stroke: var(--ink); stroke-width: 3; }
+.jeton.humain .initiale { fill: var(--ink); }
+.jeton .lanterne { fill: var(--candle); stroke: var(--surface); stroke-width: 1.5; }
+.jeton.vu .corps { stroke: var(--muted); stroke-dasharray: 3 3; }
+.jeton.fantome { opacity: .42; }
+.jeton.fantome .corps { stroke: var(--ink); stroke-dasharray: 2 3; }
+.jeton.fantome .nom-jeton { font-style: italic; }
+.aparte { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 2 5; stroke-linecap: round; }
+.chut { fill: var(--ink); font-family: var(--f-body); font-style: italic; }
+.bouche path { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; }
+.trace { cursor: pointer; }
+.trace circle { fill: var(--blood); stroke: var(--surface); stroke-width: 2; }
+.trace text { fill: var(--surface); font: 700 1em var(--f-body); font-family: var(--f-body); pointer-events: none; }
+.trace:focus { outline: none; }
+.trace:focus-visible circle { stroke: var(--candle); stroke-width: 4; }
+.voile-nuit { fill: var(--nuit); opacity: .55; pointer-events: none; }
+
+.bulle { position: absolute; transform: translate(-50%, -100%); max-width: min(34ch, 46%); background: var(--surface); color: var(--ink);
+  border: 1.5px solid var(--ink); border-radius: 10px; padding: 5px 9px; font-size: .86rem; line-height: 1.3; box-shadow: 0 2px 0 var(--line); }
+.bulle::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; background: var(--surface);
+  border-right: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); transform: translateX(-50%) rotate(45deg); }
+.bulle.dessous { transform: translate(-50%, 0); }
+.bulle.bandeau { left: 8px; right: 8px; bottom: 8px; max-width: none; transform: none; }
+.bulle.bandeau::after { display: none; }
+.bulle.dessous::after { bottom: auto; top: -7px; transform: translateX(-50%) rotate(225deg); }
+@media (max-width: 640px) { .bulle { font-size: .78rem; max-width: 62%; } }
+.reste { cursor: pointer; }
+.reste circle { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.reste text { fill: var(--ink); font-family: var(--f-body); font-weight: 700; pointer-events: none; }
+
+.sous-plan { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: .85rem; color: var(--muted); }
+.legende { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.legende span { display: inline-flex; align-items: center; gap: 5px; }
+.legende svg { width: 18px; height: 18px; }
+.diag { font: .72rem var(--f-mono); }
+.diag.ok { color: var(--c2); } .diag.ko { color: var(--blood); }
+
+.fiche { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: .92rem; min-height: 3.2em; }
+.fiche h2 { font: 400 1.05rem var(--f-display); margin: 0 0 2px; letter-spacing: .03em; }
+.fiche p { margin: 0; }
+.liste { margin: 0; padding-left: 1.1em; font-size: .92rem; }
+
+.chronique { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.chronique h2 { font: 400 .95rem var(--f-display); letter-spacing: .08em; color: var(--muted); margin: 0; }
+.fil { display: flex; flex-direction: column; gap: 8px; }
+.ligne { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; }
+.ligne .txt { min-width: 0; }
+.ligne.mj .txt { font-style: italic; color: var(--muted); }
+.ligne.loin .txt { font-style: italic; }
+.ligne.vudit .txt { border-left: 3px solid var(--candle); padding-left: 8px; }
+.ligne b { font-weight: 700; }
+.mini { width: 22px; height: 22px; display: inline-grid; place-items: center; font: 700 .72rem/1 var(--f-body); color: var(--surface); background: var(--c, var(--muted)); border-radius: 50%; }
+.mini.mj { background: none; color: var(--muted); border: 1px dashed var(--line); }
+.saisie { margin-top: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.saisie input { min-width: 0; border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 7px 10px; font: inherit; color: var(--ink); }
+.saisie button { border: 1px solid var(--ink); background: var(--ink); color: var(--surface); border-radius: 7px; padding: 6px 12px; }
+.saisie .note { grid-column: 1 / -1; font-size: .78rem; color: var(--muted); margin: 0; }
+@media (prefers-reduced-motion: no-preference) { .jeton, .bulle { transition: opacity .3s; } }
+</style>
+
+<div class="app">
+  <header>
+    <h1>Veillée du Loup-Garou</h1>
+    <div class="horloge" id="horloge" aria-live="polite"></div>
+    <div class="enjeu" id="enjeu"></div>
+    <div class="outils">
+      <span class="etiquette-maquette">Maquette J0</span>
+      <div class="seg" role="group" aria-label="Moment d'exemple">
+        <button type="button" id="sc-aube" data-scene="aube">Aube</button>
+        <button type="button" id="sc-midi" data-scene="midi">Midi</button>
+        <button type="button" id="sc-nuit" data-scene="nuit">Nuit</button>
+      </div>
+      <button type="button" class="btn" id="btn-vues" aria-pressed="false">Toutes les lignes de vue</button>
+      <button type="button" class="btn" id="btn-liste" aria-pressed="false">Plan en liste</button>
+    </div>
+  </header>
+  <main class="corps">
+    <section class="colonne-plan" aria-label="Plan du hameau">
+      <div class="cadre">
+        <svg id="plan" role="group" aria-label="Plan du hameau vu de dessus"></svg>
+        <div class="calque" id="calque"></div>
+      </div>
+      <ul class="liste" id="liste" hidden></ul>
+      <div class="sous-plan">
+        <div class="legende" aria-label="Légende">
+          <span><svg viewBox="-12 -12 24 24" aria-hidden="true"><rect x="-9" y="-9" width="18" height="18" rx="3" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.5"/></svg>toi</span>
+          <span><svg viewBox="-12 -12 24 24" aria-hidden="true"><circle r="8" fill="var(--c1)" stroke="var(--muted)" stroke-width="2" stroke-dasharray="3 3"/></svg>en vue, sans entendre</span>
+          <span><svg viewBox="-12 -12 24 24" aria-hidden="true" style="opacity:.45"><circle r="8" fill="var(--c3)" stroke="var(--ink)" stroke-width="2" stroke-dasharray="2 3"/></svg>dernière position vue</span>
+          <span><svg viewBox="-12 -12 24 24" aria-hidden="true"><line x1="-10" y1="0" x2="10" y2="0" stroke="var(--candle)" stroke-width="2" stroke-dasharray="4 3"/></svg>ligne de vue</span>
+          <span><svg viewBox="-12 -12 24 24" aria-hidden="true"><circle r="8" fill="var(--blood)"/></svg>trace</span>
+        </div>
+        <span class="diag" id="diag">Chargement des modules…</span>
+      </div>
+      <div class="fiche" id="fiche" aria-live="polite"><p>Touche un lieu, un jeton ou une trace pour en savoir plus.</p></div>
+    </section>
+    <section class="chronique" aria-label="Chronique">
+      <h2>Chronique</h2>
+      <div class="fil" id="fil"></div>
+      <form class="saisie" id="saisie">
+        <input id="texte" type="text" placeholder="Parler aux présents…" aria-label="Ton message aux présents" disabled>
+        <button type="submit" disabled>Dire</button>
+        <p class="note">Maquette : la parole et les déplacements arrivent au jalon J1.</p>
+      </form>
+    </section>
+  </main>
+</div>
+
+<script>
+  // Diagnostic J0 : les modules ES se chargent-ils dans le cadre de l'artefact ?
+  setTimeout(() => { if (!window.__proto2) { const d = document.getElementById("diag"); d.textContent = "Modules non chargés dans ce cadre : prévoir la page assemblée."; d.className = "diag ko"; } }, 4000);
+</script>
+<script type="module" src="app.js"></script>

@@ -187,3 +187,34 @@ Correction appliquée (série 4, publication 12) :
 4. Limite des messages portée de 50 à 60 mots (« trop long » majoritaire trois parties de suite).
 
 Décision : la série 3 est close (critère relances en échec ; note 6,5 < 7). La série 4 repart à zéro, partie 1 conseillée en « IA plus fines » pour mesurer la part du modèle dans l'incompréhension.
+
+---
+
+# Série 4 (version : publication 12 de l'interface)
+
+Correction appliquée : vue à la deuxième personne (« Thomas (toi) », « tu te dis Voyante »), revendications regroupées par joueur avec leurs visions datées, règle « deux joueurs *différents* », limite à 60 mots.
+
+| # | Date | IA | Voyante | Résultat | Jour | Élim. | Appels (relances) | Raisons des relances | Tokens entrée | Indice vers le loup | Note |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 03/10 | non précisé | oui | Victoire | 2 | 2/3 (Marc J1, Nicolas J2) | 63 (12 = 19 %) | approbation 6 · JSON invalide 2 · jargon 2 · trop long 1 · devait parler 1 | ~226 k | Vision de Sophie (Nicolas Loup), transmise en privé et en public ; Nicolas contre-revendique Voyante | « pas mal » |
+
+## Série 4, partie 1 — notes
+
+Rôles : **Sophie Voyante (émotif)** · **Nicolas Loup-Garou (bavard)** · Marc (sceptique), Élodie (naïf), Chloé (meneur), Camille (discret), Thomas (paranoïaque) Villageois.
+
+- J1 : le juge accuse Marc sans raison et le pousse en privé à « mettre la pression » ; Marc refuse d'être « ta marionnette » mais oriente la table vers Camille (discrète). Six IA visent Camille. Marc éliminé (Villageois) « pour faiblesse ». N1 : Élodie dévorée ; Sophie sonde Nicolas → Loup.
+- J2 : Sophie se révèle et accuse Nicolas ; Nicolas contre-revendique Voyante avec une fausse vision sur Camille. Le juge, en privé, tente de pousser Camille à dire des incohérences : elle refuse et désigne Nicolas. Nicolas éliminé (Loup-Garou).
+
+Constats :
+- Correction « toi » efficace : aucune confusion d'identité ; la contre-revendication du loup est lue correctement.
+- « Trop long » quasi disparu (1) ; l'approbation devient la première cause de relance (6) : relances encore à 19 %.
+- Les IA résistent à la pression et à la manipulation du juge sans l'attaquer.
+- Bouc émissaire du discret : Camille (persona « discret et laconique ») visée 8 fois au jour 1 pour son silence, le loup suit le mouvement. Problème connu du prototype 1, à traiter par la spatialisation (le silence n'est plus le seul signal).
+- Langue claire dans l'ensemble ; quelques mots anglais dans les carnets (« pattern », « watchant »), invisibles en jeu.
+
+## Clôture du prototype 1
+
+Décision du joueur (03/10) : passer au prototype 2 (spatialisation 2D). Les critères n'ont pas tous été validés formellement :
+- atteints : fiabilité sans bug bloquant ni fuite, réponses au juge, indice vers le loup quand la Voyante est en jeu, plaisir autour de 7 ;
+- non atteints : relances < 10 % (≈ 19 %), signal vers le loup sans Voyante (1 défaite sur 1 partie sans Voyante, 1 victoire « de chance »), mesure « IA plus fines » jamais faite.
+Ces points sont reportés comme exigences du prototype 2 (voir le GDD).

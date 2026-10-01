@@ -218,16 +218,16 @@ dl.aujourdhui dd { margin: 0; }
 <script>
 /* =========================================================== données */
 const PRENOMS = [["Marc","m"],["Léa","f"],["Camille","f"],["Julien","m"],["Sophie","f"],["Thomas","m"],["Élodie","f"],["Hugo","m"],["Chloé","f"],["Nicolas","m"]];
-// [étiquette, description, tic de langage (utilisé avec parcimonie, le moteur empêche la répétition)]
+// [étiquette, description, tic de langage (utilisé avec parcimonie, le moteur empêche la répétition), angle d'enquête propre]
 const PERSOS = [
-  ["meneur autoritaire","Tu prends les choses en main, tu tranches vite et tu donnes des ordres. Phrases courtes et impératives, tu tutoies tout le monde et tu exiges des réponses.","Écoutez-moi bien."],
-  ["paranoïaque","Tu vois des complots partout et tu soupçonnes d'abord ceux qui sont gentils avec toi. Tu poses des questions précises et tu t'inquiètes de chaque aparté.","C'est louche…"],
-  ["discret et laconique","Tu parles peu, en phrases très courtes (souvent moins de dix mots). Tu passes volontiers ton tour, sauf quand on t'interpelle : tu réponds alors sèchement et précisément.",null],
-  ["bavard sympathique","Chaleureux et familier, tu plaisantes, tu appelles les gens par leur prénom avec affection, tu digresses un peu.","Bon, les amis…"],
-  ["sceptique cynique","Tu doutes de tout, ironique et mordant. Tu démontes les arguments et tu exiges des raisons solides.","Ben voyons."],
-  ["émotif","Tu réagis fort : peur, colère, chagrin quand quelqu'un meurt. Tu te sens vite accusé, tu fais appel aux sentiments.","Oh là là !"],
-  ["stratège calculateur","Froid et méthodique, tu raisonnes en probabilités et en listes. Tu compares déclarations et votes, tu proposes des plans.","Logiquement…"],
-  ["naïf optimiste","Tu crois volontiers ce qu'on te dit et tu veux que tout le monde s'entende. Tu changes facilement d'avis, sauf face à une certitude. Ton doux, tu vouvoies.","Je veux croire en vous."],
+  ["meneur autoritaire","Tu prends les choses en main, tu tranches vite et tu donnes des ordres. Phrases courtes et impératives, tu tutoies tout le monde et tu exiges des réponses.","Écoutez-moi bien.","Tu regardes comment chacun répond au juge : qui répond franchement, qui esquive, qui détourne la question vers quelqu'un d'autre."],
+  ["paranoïaque","Tu vois des complots partout et tu soupçonnes d'abord ceux qui sont gentils avec toi. Tu poses des questions précises et tu t'inquiètes de chaque aparté.","C'est louche…","Tu regardes les apartés et les messages privés : qui se parle à l'écart, avec qui, et ce que ça change ensuite à leurs accusations."],
+  ["discret et laconique","Tu parles peu, en phrases très courtes (souvent moins de dix mots). Tu passes volontiers ton tour, sauf quand on t'interpelle : tu réponds alors sèchement et précisément.",null,"Tu regardes les victimes du Loup : qui elles visaient avant de mourir, qui les visait, et à qui chaque mort profite."],
+  ["bavard sympathique","Chaleureux et familier, tu plaisantes, tu appelles les gens par leur prénom avec affection, tu digresses un peu.","Bon, les amis…","Tu regardes la cohérence de chacun d'un jour à l'autre : tu compares ce qu'un joueur disait hier et ce qu'il dit aujourd'hui."],
+  ["sceptique cynique","Tu doutes de tout, ironique et mordant. Tu démontes les arguments et tu exiges des raisons solides.","Ben voyons.","Tu traques les erreurs de faits et les contradictions : une affirmation fausse sur le journal, une version qui change."],
+  ["émotif","Tu réagis fort : peur, colère, chagrin quand quelqu'un meurt. Tu te sens vite accusé, tu fais appel aux sentiments.","Oh là là !","Tu regardes qui défend qui : qui protège un joueur, qui lâche un allié quand le vent tourne."],
+  ["stratège calculateur","Froid et méthodique, tu raisonnes en probabilités et en listes. Tu compares déclarations et votes, tu proposes des plans.","Logiquement…","Tu regardes le tableau des accusations et des votes : qui a accusé qui, dans quel ordre, et qui a poussé à éliminer des innocents."],
+  ["naïf optimiste","Tu crois volontiers ce qu'on te dit et tu veux que tout le monde s'entende. Tu changes facilement d'avis, sauf face à une certitude. Ton doux, tu vouvoies.","Je veux croire en vous.","Tu cherches d'abord qui croire : qui a dit des choses vérifiées, à qui tu peux faire confiance ; tu défends ceux qui te paraissent sincères."],
 ];
 // La carte s'appelle « Voyante » quel que soit le joueur.
 const ROLES = { villageois: ["Villageois","Villageoise"], loup: ["Loup-Garou","Loup-Garou"], voyante: ["Voyante","Voyante"] };
@@ -364,6 +364,7 @@ function tropProche(a, b, seuil = 0.7) {
   let inter = 0; for (const w of A) if (B.has(w)) inter++;
   return inter / (A.size + B.size - inter) >= seuil;
 }
+const JARGON = /\b(?:le loup respire|respire|silence actif|z[ée]ro risque|copi[ée]-coll[ée]|faits? (?:publics? )?mesurables?|on juge le visible|priv[ée] invisible|ce sch[ée]ma tient|pattern)\b/i;
 const APPROBATION = /^\s*(?:oui,?\s*)?(?:[\p{L}-]+,\s*)?[\p{L}-]+(?:\s+[\p{L}-]+)?\s+(?:a|as|avez|avait)\s+(?:bien\s+)?raison\b/iu;
 function ticDe(nom) {
   const tic = joueur(nom).perso?.[2]; if (!tic) return null;
@@ -412,18 +413,17 @@ Tu es ${f ? "une" : "un"} ${lab}. Tu ne connais le rôle de personne. Objectifs 
   const t = ticDe(nom);
   const perso = `Ta personnalité : ${j.perso[0]}. ${j.perso[1]}` + (t ? `\nTon tic de langage : « ${t.tic} ». ${t.recent ? "Tu l'as utilisé dans ton dernier message : ne l'utilise PAS cette fois." : "Utilise-le rarement, jamais deux messages de suite."}` : "")
     + "\nTa personnalité règle ton ton, pas ton jugement : raisonne sur les faits.";
+  const angle = j.perso[3] || "Tu formes ton avis à partir des faits du journal.";
   const methode = [
-    loup ? "## Ce que les villageois vont chercher (anticipe-le)" : "## Méthode d'enquête",
-    "1. Le Loup dévore souvent ceux qui le soupçonnent : regarde ce que visaient les morts (voir Faits établis).",
-    "2. Juge sur le fond, pas sur le style : accuser tôt, organiser le débat ou parler beaucoup n'est pas suspect en soi (il faut bien commencer). Ce qui compte : la cohérence d'un joueur dans le temps, ses changements de cible sans raison, et qui a poussé à éliminer un innocent avec de mauvais arguments.",
-    "2 bis. Le Loup se cache aussi bien dans la neutralité que dans l'agitation : méfie-toi de qui ne prend jamais de risque, approuve tout le monde, ne lance aucune piste et ne fait que rejoindre les accusations déjà lancées.",
-    "3. Vérifie dans le journal toute affirmation avant de la reprendre ; si un fait cité est faux, corrige-le publiquement : un menteur se trahit ainsi.",
-    ...(c.voyante ? ["4. Une Voyante révélée qui est dévorée la nuit suivante disait sans doute vrai ; si deux joueurs se disent Voyante, l'un des deux est le Loup.",
-      "5. Pousser la Voyante à se révéler en public aide le Loup : c'est un indice faible, jamais une preuve."] : []),
-    "6. Quand presque tout le monde accuse la même personne, vérifie que les arguments tiennent sur des faits, et regarde qui a rejoint le mouvement sans rien y ajouter. Parmi les IA seulement : le juge n'est jamais un suspect.",
-    "7. Ne commence jamais un message en approuvant quelqu'un (« X a raison ») : dis directement ce que TU apportes. Ne reprends ni l'argument ni les formules d'un autre (« on juge le visible », « faits mesurables »…) sans y ajouter un fait nouveau, et ne répète jamais un message déjà envoyé.",
-    "8. Avant de citer un chiffre (nombre de morts, de votes, d'accusations), vérifie-le dans les Faits établis.",
-    "N'applique une règle que si elle correspond à un fait précis du journal.",
+    loup ? "## Comment les villageois enquêtent (anticipe-le)" : "## Ta façon d'enquêter (la tienne, pas celle des autres)",
+    ...(loup ? ["Chaque villageois enquête sous un angle différent : réponses au juge, apartés et messages privés, choix de tes victimes, cohérence d'un jour à l'autre, erreurs de faits, qui défend qui, ordre des accusations. Ne sois ni le plus agité ni le plus effacé, et garde une ligne cohérente."]
+      : [angle,
+         "Forme ton propre avis à partir de cet angle : il est normal de ne pas soupçonner la même personne que les autres. Si ton angle ne montre rien de net, dis-le plutôt que de rejoindre l'avis général. Explique toujours sur quel fait précis tu t'appuies."]),
+    "Règles de faits :",
+    ...(c.voyante ? ["- Une Voyante révélée qui est dévorée la nuit suivante disait sans doute vrai ; si deux joueurs se disent Voyante, l'un des deux est le Loup."] : []),
+    "- Vérifie dans le journal toute affirmation avant de la reprendre, et tout chiffre dans les Faits établis. Si un fait cité est faux, corrige-le.",
+    "- Le juge n'est jamais un suspect.",
+    "- Ne commence pas un message en approuvant quelqu'un ; n'emprunte pas les formules des autres ; ne répète pas un message déjà envoyé.",
   ].join("\n");
   const morts = S.morts.map(m => `${m.nom}${m.role ? ` (${m.role})` : ""} — ${m.cause}`).join(" ; ") || "aucun";
   const cm = ciblesDesMorts(nom).filter(m => m.cibles.length).map(m => `${m.nom} (${m.cause}) visait ${m.cibles.map(([x, n]) => fois(x, n)).join(", ")}`);
@@ -502,6 +502,8 @@ function lireParole(o, nom, tolerant) {
   const nbMots = nettoyer(o.texte).split(" ").length;
   if (!tolerant && nbMots > S.cfg.maxMots) throw new Invalide(`ton texte fait ${nbMots} mots : reformule-le en ${S.cfg.maxMots} mots maximum, sans rien couper au milieu d'une phrase`);
   const texte = nettoyer(o.texte, S.cfg.maxMots); verifierRevelation(texte, nom);
+  const jargon = !tolerant && JARGON.exec(texte);
+  if (jargon) throw new Invalide(`évite la formule toute faite « ${jargon[0]} » : dis la même idée avec tes mots et un fait précis`);
   if (APPROBATION.test(texte)) throw new Invalide("ne commence pas en approuvant quelqu'un (« X a raison ») : dis directement ce que tu apportes");
   if (S.log.filter(m => m.de === nom).slice(-6).some(m => tropProche(m.texte, texte))) throw new Invalide("tu as déjà dit presque la même chose : apporte un fait nouveau, ou passe");
   if (S.log.filter(m => m.a === TOUS && m.de !== MJ && m.de !== nom).slice(-10).some(m => tropProche(m.texte, texte, 0.55)))

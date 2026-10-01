@@ -53,3 +53,18 @@ Constats :
 - Jargon issu du prompt (« le Loup respire », « silence actif », « zéro risque »).
 - Sans Voyante, signal faible : le loup varie ses victimes, n'est jamais visé, suit les accusations des autres.
 - Critère 2 en échec deux parties de suite → arrêt de la série, une correction ciblée proposée : un angle d'enquête propre à chaque personnalité, suppression de la méthode commune et du vocabulaire réutilisé.
+
+---
+
+# Série 2 (version : publication 10 de l'interface)
+
+Correction appliquée après l'arrêt de la série 1 : **un regard différent par IA**.
+- La méthode d'enquête commune est supprimée. Chaque personnalité a son angle : réponses au juge (meneur), apartés et privés (paranoïaque), victimes du loup (discret), cohérence dans le temps (bavard), erreurs de faits (sceptique), qui défend qui (émotif), ordre des accusations et votes (stratège), qui croire (naïf).
+- Consigne : former son propre avis, ne pas rejoindre l'avis général si son angle ne montre rien, citer le fait précis.
+- Restent seulement des règles de faits (vérifier, le juge n'est pas suspect, logique Voyante).
+- Jargon observé refusé au premier essai (« le Loup respire », « silence actif », « zéro risque », « copié-collé », « faits mesurables », « on juge le visible », « privé invisible », « ce schéma tient », « pattern »).
+
+Mêmes critères que la série 1. Conseillé : au moins une partie avec Voyante et une sans.
+
+| # | Date | IA | Voyante | Résultat | Jour | Élim. utilisées | Appels (relances) | Tokens entrée | Indice vers le loup | Avis divers ? | Faits faux | Note |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|

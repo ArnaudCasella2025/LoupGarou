@@ -87,3 +87,23 @@ Constats :
 - Relances 12 % : probablement le filtre de jargon ; à vérifier sur la partie suivante.
 - Nouvelles formules émergentes : « c'est mon fil », « profite du chaos ».
 - Hugo éliminé pour un retournement qu'il avait lui-même expliqué en révélant un privé.
+
+| 2 | 02/10 | rapides | oui | Victoire | 3 | 2/3 (J1 passé) | 69 (13 = 19 %) | ~245 k | Julien (paranoïaque, angle « privés ») révèle le privé nocturne de Thomas ; Thomas avait visé Julien, innocenté par la Voyante | ✓ | 1-2, mais phrases incohérentes | 7/10 |
+
+## Série 2, partie 2 — notes (avec Voyante)
+
+Rôles : Marc Villageois (stratège) · **Nicolas Voyante (émotif)** · Julien Villageois (paranoïaque) · Élodie Villageoise (sceptique) · **Thomas Loup-Garou (naïf)** · Camille Villageoise (discret) · Chloé Villageoise (meneur).
+
+- J1 : présentations, journée passée. N1 : Thomas dévore Élodie ; Nicolas sonde Julien → Villageois.
+- J2 : Nicolas transmet sa vision au juge en privé puis se révèle en public ; Julien et Camille doutent de lui ; Nicolas et Marc visent Chloé, Chloé vise Marc. Chloé (Villageoise) éliminée. N2 : Thomas dévore Nicolas (Voyante révélée, consigne du loup appliquée) ; Nicolas avait sondé Marc → Villageois, sans pouvoir le transmettre. Privé Thomas → Julien.
+- J3 : le juge réduit à Camille, Thomas, Marc (Julien innocenté) ; Julien révèle le privé de Thomas ; Thomas éliminé (Loup-Garou).
+
+Retour du joueur (7/10) :
+- Bien : prise de risque de la Voyante, dévorée tôt, « les erreurs comme ça, c'est pas mal ».
+- Pas bien : « les phrases veulent rien dire parfois, c'est le point le plus désagréable ». Exemple : privé de Nicolas au juge « Vision nuit 1 : Julien villageois, confirmée. Chloé force les votes sans faits concrets : c'est elle. Je sais que tu veux me dévorer nuit 2, c'est logique, mais avant éliminez-la. » (s'adresse au juge comme au loup, style télégraphique, tu/vous mélangés).
+
+Constats :
+- Langue : style télégraphique (« J2 je révèle Voyante quand c'est stratégique », « Nicolas Voyante, confirmée par sa dévoration »), confusion de destinataire, répétitions (« Marc, Thomas, Thomas »).
+- Relances 19 % : critère 1 en échec deux parties de suite (filtre de jargon probablement en cause).
+- Angles d'enquête : l'angle « privés » du paranoïaque a produit l'indice décisif.
+- Décision : partie de diagnostic en « IA plus fines » (critère 6) avant toute correction, pour savoir si l'incohérence vient du modèle rapide ou des prompts (format abrégé J1/N2 du journal).

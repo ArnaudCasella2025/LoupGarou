@@ -286,7 +286,7 @@ function nouvellePartie(opts) {
   const lesIA = noms.map(n => n[0]);
   const loup = choix(lesIA); roles[loup] = "loup";
   if (opts.voyante) roles[choix(lesIA.filter(n => n !== loup))] = "voyante";
-  S = { version: 2, cfg: { ...opts, cap: 4, maxMots: 50, maxVue: 30, maxDecl: 10, consultes: 5 }, joueurs, roles, vivants: joueurs.map(j => j.nom), morts: [],
+  S = { version: 2, cfg: { ...opts, cap: 4, maxMots: 50, maxVue: 20, maxDecl: 6, consultes: 5 }, joueurs, roles, vivants: joueurs.map(j => j.nom), morts: [],
         jour: 1, phase: "jour", microtour: 1, priorite: [], frustres: [], voteHumain: null, log: [], coulisses: [], gagnant: null,
         votes: [], resumes: {}, notes: {}, attentes: {}, carnets: {}, reflexions: {}, revendications: [],
         visions: [], sansElimination: [], dernierAppel: {}, tick: 0, silence: {}, parole: null,
@@ -329,14 +329,22 @@ const texteVision = v => v ? `${v.joueur} ${v.loup ? "est le Loup-Garou" : "n'es
 const texteRevendication = r => r.role === "voyante" ? `se dit Voyante${r.vision ? ` — vision : ${texteVision(r.vision)}` : ""}` : "se dit villageois";
 
 /* =========================================================== vue d'un agent (seule source de son contexte) */
+function quand(m) {   // « hier », « la nuit dernière »… plutôt que J1 / N2
+  const j = m.jour, auj = S.jour;
+  if (m.phase === "jour" || m.phase === "vote") return j === auj && S.phase !== "nuit" ? "Aujourd'hui" : j === auj ? "Ce jour-là (aujourd'hui)" : j === auj - 1 ? "Hier" : `Le jour ${j}`;
+  if (m.phase === "nuit") return j === auj && S.phase === "nuit" ? "Cette nuit" : j === auj - 1 ? "La nuit dernière" : `La nuit ${j}`;
+  return "À la fin";
+}
 function ligneVue(g, m, nom) {
-  const t = `J${m.jour} ${m.phase}`;
-  if (g === "aparte") return `${t} · (${m.de} et ${m.a} se parlent à l'écart)`;
-  if (m.de === MJ) return `${t} · MJ${m.a === nom ? " (à toi seul)" : ""} : ${m.texte}`;
-  const de = m.de === nom ? "toi" : m.de === humain() ? `${m.de} (le juge)` : m.de, q = JSON.stringify(m.texte);
-  const extra = (m.vise ? ` [vise ${m.vise === nom ? "toi" : m.vise}]` : "") + (m.revendique ? ` [${texteRevendication({ role: m.revendique, vision: m.vision })}]` : "");
-  if (m.a === TOUS) return `${t} · ${de} → tous : ${q}${extra}`;
-  return `${t} · ${de} → ${m.a === nom ? "toi" : m.a} (privé) : ${q}${extra}`;
+  const t = quand(m), h = humain();
+  if (g === "aparte") return `${t}, ${m.de} et ${m.a} se sont parlé à l'écart.`;
+  if (m.de === MJ) return `${t}, le meneur de jeu${m.a === nom ? " (à toi seul)" : ""} : ${m.texte.replace(/^\[[^\]]*\]\s*/, "")}`;
+  const q = JSON.stringify(m.texte);
+  const extra = (m.vise ? ` (accuse ${m.vise === nom ? "toi" : m.vise})` : "") + (m.revendique ? ` (${texteRevendication({ role: m.revendique, vision: m.vision })})` : "");
+  const qui = m.de === nom ? "tu as dit" : `${m.de}${m.de === h ? " (le juge)" : ""} a dit`;
+  if (m.a === TOUS) return `${t}, ${qui} à tout le monde : ${q}${extra}`;
+  if (m.a === nom) return `${t}, ${m.de}${m.de === h ? " (le juge)" : ""} t'a dit en privé : ${q}${extra}`;
+  return `${t}, tu as dit en privé à ${m.a}${m.a === h ? " (le juge)" : ""} : ${q}${extra}`;
 }
 function journalVue(nom) {
   let el = elementsVisibles(nom); const maxi = S.cfg.maxVue, L = [], h = humain();
@@ -427,7 +435,7 @@ Tu es ${f ? "une" : "un"} ${lab}. Tu ne connais le rôle de personne. Objectifs 
   ].join("\n");
   const morts = S.morts.map(m => `${m.nom}${m.role ? ` (${m.role})` : ""} — ${m.cause}`).join(" ; ") || "aucun";
   const cm = ciblesDesMorts(nom).filter(m => m.cibles.length).map(m => `${m.nom} (${m.cause}) visait ${m.cibles.map(([x, n]) => fois(x, n)).join(", ")}`);
-  const rv = revendicationsVues(nom).map(r => `${r.de} (J${r.jour}${r.a === TOUS ? ", public" : ", privé"}) ${texteRevendication(r)}`);
+  const rv = revendicationsVues(nom).map(r => `${r.de} (jour ${r.jour}, ${r.a === TOUS ? "en public" : "en privé"}) ${texteRevendication(r)}`);
   const auj = visesVues(nom, S.jour), contreMoi = auj.filter(a => a.contre === nom), cpt = {};
   for (const a of auj) if (a.contre !== humain()) cpt[a.contre] = (cpt[a.contre] || 0) + 1;
   const top = Object.entries(cpt).sort((a, b) => b[1] - a[1])[0];
@@ -448,7 +456,7 @@ Tu es ${f ? "une" : "un"} ${lab}. Tu ne connais le rôle de personne. Objectifs 
   const carnet = Object.entries(S.carnets[nom] || {}).filter(([n]) => S.vivants.includes(n)).sort((a, b) => b[1][0] - a[1][0]);
   const blocCarnet = `## Ton carnet ${loup ? "des menaces (privé : qui te soupçonne le plus, 0-100)" : "de soupçons (privé : probabilité 0-100 que chacun soit le Loup)"}\n`
     + (carnet.length ? carnet.map(([n, [s, r]]) => `${n} ${s} — ${r}`).join("\n") + "\nMets-le à jour avec les nouveaux faits." : "(vide : établis-le maintenant)");
-  const decl = S.log.filter(m => m.de === nom).slice(-S.cfg.maxDecl).map(m => `J${m.jour} ${m.phase} · ${m.a === TOUS ? "public" : "à " + m.a + " (privé)"} : ${JSON.stringify(m.texte)}${m.vise ? ` [visait ${m.vise}]` : ""}`).join("\n") || "(tu n'as encore rien dit)";
+  const decl = S.log.filter(m => m.de === nom).slice(-S.cfg.maxDecl).map(m => `${quand(m)}, ${m.a === TOUS ? "à tout le monde" : "en privé à " + m.a} : ${JSON.stringify(m.texte)}${m.vise ? ` (tu accusais ${m.vise})` : ""}`).join("\n") || "(tu n'as encore rien dit)";
   const parts = [SYSTEME, `\nTu es ${nom}.`, regles, `\n## Ta fiche (secrète)\n${fiche}`, perso, `\n${methode}`, `\n${faits}`, `\n${juge}`,
     ...(S.phase === "jour" ? [`\n${blocCarnet}`] : []),
     `\n## Tes déclarations précédentes (reste cohérent avec elles)\n${decl}`,
@@ -467,9 +475,11 @@ Réponds UNIQUEMENT par un objet JSON sur une ligne, en commençant par "reflexi
 {"reflexion":"...","carnet":{...},"action":"parler","envie":<0-100>,"canal":"prive","a":"<prénom d'un vivant, le juge compris>","texte":"...","vise":"<prénom ou null>","revendique":null}
 {"reflexion":"...","carnet":{...},"action":"parler","envie":<0-100>,"canal":"public","a":"tous","texte":"...","vise":"<prénom ou null>","revendique":null,"prive":{"a":"<prénom>","texte":"...","vise":null,"revendique":null}}
 - envie : 0 à 100, honnête ; la gonfler sans raison lasse le village.
-- reflexion : ton raisonnement privé d'abord (faits, qui ment, que faire), 50 mots maximum. Personne ne le lira pendant la partie.
-- carnet : pour chaque autre vivant, ${loup ? "la menace qu'il représente pour toi" : "la probabilité (0-100) qu'il soit le Loup"} et une raison de 10 mots maximum. Reprends et corrige ton carnet précédent.
-- texte : français, ${c.maxMots} mots maximum, à la première personne, dans ta personnalité, appuyé sur des faits du journal.
+- reflexion : tes notes privées d'abord (faits, qui ment, que faire), 50 mots maximum, style libre. Personne ne les lira pendant la partie.
+- carnet : pour chaque autre vivant, ${loup ? "la menace qu'il représente pour toi" : "la probabilité (0-100) qu'il soit le Loup"} et une raison de 10 mots maximum (notes pour toi). Reprends et corrige ton carnet précédent.
+- texte : ce que tu dis à voix haute à la table, en français parlé, ${c.maxMots} mots maximum, dans ta personnalité. Ce n'est PAS une note : UNE seule idée, en 1 à 3 phrases complètes (sujet, verbe, complément), compréhensibles sans avoir lu le reste. Nomme la personne dont tu parles, dis ce qu'elle a fait et pourquoi ça compte. Pas d'abréviations ni de style télégraphique : dis « hier », « cette nuit », jamais « J1 » ou « N2 ». Garde le même tutoiement ou vouvoiement du début à la fin.
+- En privé, tu t'adresses uniquement à ton destinataire. Le juge n'est jamais le Loup : ne lui parle jamais comme au Loup.
+- Exemples du ton attendu (prénoms inventés, absents de la partie ; ne les recopie pas) : « Paul, hier tu accusais Inès, et aujourd'hui tu la défends. Qu'est-ce qui t'a fait changer d'avis ? » ; « Je ne crois pas que ce soit Inès : elle a répondu au juge tout de suite, et sa réponse colle à ce qu'elle disait hier. » ; « Juge, je n'ai rien de solide pour l'instant, je préfère écouter encore un tour. »
 - vise : le joueur que ton message accuse, ou null.
 - revendique : ${c.voyante ? `null, "villageois" ou "voyante" ; avec "voyante", ajoute "vision":{"joueur":"<prénom>","loup":true ou false}.` : `null ou "villageois".`}
 - prive (facultatif, seulement avec "canal":"public") : un message privé à une seule personne, envoyé en même temps que ton message public (par exemple dire une chose au juge en privé tout en parlant à tous). Mêmes champs et mêmes limites qu'un message ; ne l'ajoute que s'il est utile.`;
@@ -600,7 +610,12 @@ function fauxAgent(nom) {
 
 async function appeler(nom, raison) {
   const prompt = vue(nom, raison);
-  S.compteur.tin += tokens(prompt); S.compteur.appels++; if (raison) S.compteur.relances++;
+  S.compteur.tin += tokens(prompt); S.compteur.appels++;
+  if (raison) {
+    S.compteur.relances++;
+    const cat = /formule toute faite/.test(raison) ? "jargon" : /mot pour mot/.test(raison) ? "reprise d'un autre" : /déjà dit/.test(raison) ? "répétition" : /approuvant/.test(raison) ? "approbation" : /mots :/.test(raison) ? "trop long" : /JSON|objet|vide/.test(raison) ? "JSON invalide" : /attend ta réponse|transmettre/.test(raison) ? "devait parler" : /vision/.test(raison) ? "vision" : "autre";
+    const r = (S.compteur.raisons ||= {}); r[cat] = (r[cat] || 0) + 1;
+  }
   let texte;
   if (S.cfg.source === "claude") {
     const s = await samplePret;
@@ -910,7 +925,7 @@ function passerJournee() {
   aConfirmer = null; selection = null;
   tour(() => {
     S.sansElimination.push(S.jour);
-    annonce(`[Délibération] ${humain()} ne désigne personne aujourd'hui.`);
+    annonce(`[Délibération] ${humain()} ne désigne personne.`);
     S.phase = "nuit"; S.attentes = {};
     annonce(`[Nuit ${S.jour}] La nuit tombe.`);
     rendre();
@@ -1269,7 +1284,9 @@ function debrief() {
     s5.append(it);
   }
   const c = S.compteur, s4 = el("section");
+  const raisons = Object.entries(c.raisons || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(" · ");
   s4.append(el("h2", null, "Compteur"), el("div", "mono", `${c.appels} appels d'agents (dont ${c.relances} relances) · ~${c.tin} tokens en entrée · ~${c.tout} en sortie (estimation)`));
+  if (raisons) s4.append(el("div", "mono", `Raisons des relances : ${raisons}`));
   d.append(s1, sV, s2, s3, s5, s4);
   return d;
 }

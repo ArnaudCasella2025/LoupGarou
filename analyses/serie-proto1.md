@@ -107,3 +107,23 @@ Constats :
 - Relances 19 % : critère 1 en échec deux parties de suite (filtre de jargon probablement en cause).
 - Angles d'enquête : l'angle « privés » du paranoïaque a produit l'indice décisif.
 - Décision : partie de diagnostic en « IA plus fines » (critère 6) avant toute correction, pour savoir si l'incohérence vient du modèle rapide ou des prompts (format abrégé J1/N2 du journal).
+
+Retour complémentaire du joueur : « ce n'est pas seulement les abréviations, des fois je comprends même pas ce qu'ils veulent dire ». Exemples relevés : « je m'écoutais J1 » (Thomas), « Chloé, tu accuses mon silence ? » alors que c'était Julien (Nicolas), « Si Loup, génie » (Julien), « n'ont pas forcé son élimination » à propos d'un joueur dévoré (Marc), « Où était Élodie avant de mourir ? » alors que le jeu n'a pas de lieux (Camille).
+Causes retenues : trop d'idées compressées en 50 mots ; style des notes (carnet) qui déteint sur la parole ; prompt lourd (≈ 4 k tokens) où le modèle confond qui a dit quoi ; capacité du modèle rapide (à mesurer en « IA plus fines »).
+
+---
+
+# Série 3 (version : publication 11 de l'interface)
+
+Correction appliquée : **lisibilité des messages**.
+- Journal des IA rédigé en toutes lettres et en repères relatifs (« Hier, Léa a dit à tout le monde : … », « La nuit dernière, Nicolas t'a dit en privé : … ») au lieu de « J1 jour · Léa → tous » ; étiquettes du meneur retirées.
+- Consigne du texte : parole dite à voix haute, une seule idée, 1 à 3 phrases complètes, nommer la personne et le fait, pas d'abréviations, tutoiement ou vouvoiement constant ; « en privé, tu t'adresses à ton seul destinataire ; le juge n'est jamais le Loup ».
+- Trois exemples de ton avec des prénoms inventés.
+- Réflexion et carnet présentés comme des notes, distinctes de la parole.
+- Prompt allégé : 20 derniers éléments du journal (au lieu de 30), 6 déclarations précédentes (au lieu de 10). Vue ≈ 2,6 à 2,9 k tokens.
+- Débrief : raisons des relances comptées par catégorie (jargon, reprise d'un autre, répétition, approbation, trop long, JSON invalide, devait parler, vision).
+
+Mesure demandée au joueur : nombre de messages incompréhensibles par partie. Partie 1 conseillée en « IA plus fines » pour isoler la part du modèle.
+
+| # | Date | IA | Voyante | Résultat | Jour | Élim. | Appels (relances) | Raisons des relances | Tokens entrée | Indice vers le loup | Messages incompréhensibles | Note |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|

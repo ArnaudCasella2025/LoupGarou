@@ -34,7 +34,11 @@ h1 { font: 400 1.5rem/1 var(--f-display); margin: 0; letter-spacing: .02em; }
 .scene { position: relative; min-height: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #0c0f16; touch-action: none; }
 @media (max-width: 860px) { .scene { height: 64svh; } }
 canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
-.aide { position: absolute; left: 10px; bottom: 10px; font-size: .8rem; color: var(--ink); background: color-mix(in srgb, #0c0f16 70%, transparent); padding: 4px 9px; border-radius: 6px; pointer-events: none; }
+.crier { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(520px, calc(100% - 24px)); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line); border-radius: 12px; padding: 7px; }
+.crier input { min-width: 0; border: 1px solid var(--line); background: var(--surface2); color: var(--ink); border-radius: 8px; padding: 7px 10px; font: inherit; }
+.crier .portee { grid-column: 1 / -1; font-size: .78rem; color: var(--muted); margin: 0 2px; }
+.aide { position: absolute; left: 10px; top: 10px; font-size: .8rem; color: var(--ink); background: color-mix(in srgb, #0c0f16 70%, transparent); padding: 4px 9px; border-radius: 6px; pointer-events: none; }
 .toast { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: min(560px, 90%); text-align: center;
   background: color-mix(in srgb, #0c0f16 82%, transparent); border: 1px solid var(--line); border-radius: 9px; padding: 7px 14px; font-size: .95rem; pointer-events: none; }
 .toast em { color: var(--candle); font-style: normal; }
@@ -45,7 +49,8 @@ canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
 .dialogue .tete { display: flex; align-items: center; gap: 10px; }
 .dialogue .tete b { font: 400 1.15rem var(--f-display); }
 .dialogue .tete span { color: var(--muted); font-size: .85rem; }
-.dialogue .tete button { margin-left: auto; }
+.dialogue .tete { flex-wrap: wrap; }
+.dialogue .tete button:first-of-type { margin-left: auto; }
 .dialogue .rep { font-size: 1rem; min-height: 1.4em; }
 .dialogue .questions { display: flex; flex-wrap: wrap; gap: 6px; }
 .dialogue .questions button { border: 1px solid var(--line); background: var(--surface2); border-radius: 18px; padding: 5px 12px; font-size: .9rem; text-align: left; }
@@ -124,7 +129,11 @@ canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
     <div class="scene" id="scene">
       <canvas id="cv" aria-label="Le village vu de dessus. Clique pour marcher, clique sur un villageois pour lui parler."></canvas>
       <div class="toast" id="toast" hidden></div>
-      <div class="aide" id="aide">Clique pour marcher · clique un villageois pour lui parler · flèches ou ZQSD</div>
+      <div class="aide" id="aide">Clique pour marcher · clique un villageois pour lui parler · flèches ou ZQSD · Entrée pour parler aux présents</div>
+      <form class="crier" id="crier" hidden>
+        <input id="crier-texte" type="text" maxlength="200" placeholder="Parler à tous ceux qui t'entendent…" aria-label="Parler à tous ceux qui sont à portée d'oreille">
+        <button class="btn fort" type="submit">Dire</button>
+      </form>
       <div class="dialogue" id="dialogue" hidden></div>
       <div class="bandeau" id="bandeau" hidden></div>
       <button class="arreter" id="arreter" type="button" hidden>Arrêter !</button>
@@ -212,11 +221,12 @@ function nouvellePartie() {
   const noms = melange(PRENOMS).slice(0, 7), persos = melange(PERSOS).slice(0, 7), maisons = melange(MAISONS);
   const loup = Math.floor(rnd() * 7);
   const ias = noms.map((nom, i) => ({ nom, i, perso: persos[i], couleur: COULEURS[i], cheveux: CHEVEUX[i], ia: true, loup: i === loup, vivant: true,
-    maison: maisons[i + 1], x: LIEUX.place.x, y: LIEUX.place.y, chemin: [], cible: null, lieu: "place", parle: null, cooldown: 0, vu: [], nuits: [], entendu: [], evenements: [], dernierLieu: null, lieuPrecedent: null, ruban: false, blesse: false, signe: null, enScene: false, alpha: 1, prochain: 0, mensonges: 0 }));
+    maison: maisons[i + 1], x: LIEUX.place.x, y: LIEUX.place.y, chemin: [], cible: null, lieu: "place", parle: null, cooldown: 0, vu: [], nuits: [], entendu: [], evenements: [], dernierLieu: null, lieuPrecedent: null, ruban: false, blesse: false, signe: null, enScene: false, alpha: 1, suit: false, suitJusqua: 0, refusSuivre: 0, prochain: 0, mensonges: 0 }));
   const moi = { nom: "Toi", humain: true, couleur: "#f1e6c8", cheveux: "#2a211a", maison: maisons[0], x: LIEUX.place.x, y: LIEUX.place.y + 70, chemin: [], vivant: true };
   G = { jour: 1, minute: JOUR_DEBUT, phase: "jour", ias, moi, morts: [], victimes: [], traces: [], peur: 0, pause: false, vitesse: 1, lent: false,
     mortDuJour: false, essais: 0, chasse: { etat: "routine", t: 0 }, lutte: null, corps: [], fleche: null, vignette: 0, silhouette: 0, flagrant: null,
     stats: { filatures: 0, attaques: 0, abandons: 0, luttes: 0, morts: 0, interrompues: 0, pasCandidat: 0, bloqueIsole: 0, bloqueJuge: 0 },
+    publique: null, credit: 0,
     scene: null, accuses: [], accIA: { dernier: 0, loupFait: false }, conseil: null, sentence: null,
     convs: [], cloche: false, journal: [], vuParMoi: new Set(), sons: [], silhouette: null, nuit: null, loupMarche: null, dialogueAvec: null, fin: null, flammes: 0 };
   // placer tout le monde autour du feu
@@ -476,7 +486,7 @@ function chasser(dt) {
   if (!L.vivant) return;
   if (C.etat === "lutte") return avancerLutte(dt);
   if (C.etat === "fuite") { if (!L.chemin.length) finirFuite(); return; }
-  const bloque = G.jour < 2 || G.mortDuJour || G.essais >= R.essaisMax || G.minute < R.debutChasse || G.minute > R.finChasse || G.scene || G.dialogueAvec === L || L.enScene;
+  const bloque = G.jour < 2 || G.mortDuJour || G.essais >= R.essaisMax || G.minute < R.debutChasse || G.minute > R.finChasse || G.scene || G.dialogueAvec === L || L.enScene || L.suit;
   if (bloque) { if (C.etat !== "routine") { C.etat = "routine"; L.chemin = []; } return; }
   C.t += dt;
   if (C.etat === "routine") {
@@ -605,6 +615,84 @@ function afficherArrestation() {
   b.textContent = `Arrêter ${L.nom} !`; b.hidden = false;
   noter("indice", `Tu vois ${L.nom} se jeter sur quelqu'un, sous tes yeux !`);
   toast(`Tu vois <em>${L.nom}</em> attaquer ! Arrête-${accord(L.nom, "le", "la")} !`);
+}
+
+/* ============================================================ confiance, « suis-moi » et parole aux présents */
+const CONFIANCE = { meneur: .5, parano: .2, discret: .4, bavard: .65, sceptique: .35, emotif: .55, stratege: .45, naif: .85 };
+function confiance(c) {   // confiance que c accorde au juge (0 à 1), calculée par le moteur
+  let t = CONFIANCE[c.perso.id] ?? .5;
+  if (G.accuses.some(a => a.nom === c.nom && a.par === "le juge")) t -= .6;
+  if (G.accuses.some(a => a.par === "le juge" && a.defenseurs && a.defenseurs.has(c.nom))) t -= .2;
+  if (G.peur >= 2) t += .15;
+  if (c.blesse) t += .3;
+  t += G.credit;
+  if (c.refusSuivre > G.minute - 120 && c.refusSuivre) t -= .3;   // vient déjà de refuser
+  return Math.max(0, Math.min(1, t));
+}
+const suiveurs = () => vivantsIA().filter(c => c.suit);
+async function demanderSuivre(c) {
+  const log = document.getElementById("dlg-log");
+  noter("dit", `Toi à ${c.nom} : « Suis-moi. »`);
+  ecouterAutour(G.moi, c, "Suis-moi.", c.lieu);
+  let accepte, raison;
+  if (suiveurs().length >= 2) { accepte = false; raison = "le juge a déjà deux personnes avec lui"; }
+  else if (c.loup) { accepte = rnd() < .5; raison = accepte ? "le suivre te fait paraître innocent, mais tu ne pourras pas chasser tant que tu es à côté de lui" : "tu as tes propres affaires et tu ne veux pas être surveillé"; }
+  else { const t = confiance(c); accepte = rnd() < t; raison = accepte ? (c.blesse ? "tu as été attaqué et tu te sens plus en sécurité avec lui" : G.peur >= 2 ? "tu as peur et tu préfères ne pas rester seul" : "tu as plutôt confiance en lui") : G.accuses.some(a => a.nom === c.nom && a.par === "le juge") ? "il t'a accusé aujourd'hui, tu n'as aucune confiance en lui" : "tu ne lui fais pas assez confiance, ou tu préfères rester libre de tes mouvements"; }
+  if (log) log.textContent = `Toi : « Suis-moi. »  —  ${c.nom} réfléchit…`;
+  c.attend = true;
+  const r = propre(c, await demander(vueIA(c, `Le juge te demande de le suivre et de rester avec lui un moment. Tu as décidé ${accepte ? "d'ACCEPTER" : "de REFUSER"}, parce que ${raison}. Dis-le-lui en une phrase, dans ta personnalité, sans changer de décision.`, 25), true), 25);
+  c.attend = false;
+  if (!c.vivant) return;
+  const texte = r ? r.texte : accepte ? pick(["D'accord, je te suis.", "Très bien, je viens avec toi.", "Allons-y, je ne te lâche pas."]) : pick(["Non, je préfère rester ici.", "Sans façon.", "Pourquoi je te suivrais ?"]);
+  c.bulle = { texte, fin: perf() + 5000 };
+  ecouterAutour(c, G.moi, texte, c.lieu);
+  noter("reponse", `${c.nom} (à toi) : « ${texte} »${accepte ? " — te suit." : " — refuse de te suivre."}`);
+  if (accepte) {
+    c.suit = true; c.suitJusqua = G.minute + (c.loup ? 60 + rnd() * 60 : 150 + rnd() * 120); c.chemin = []; if (c.parle) finirConv(c.parle);
+    evenement(c, "le juge t'a demandé de le suivre et tu as accepté");
+    for (const o of vivantsIA()) if (o !== c && dist(o, c) < VUE) evenement(o, `tu as vu ${c.nom} partir avec le juge`);
+  } else { c.refusSuivre = G.minute; evenement(c, "le juge t'a demandé de le suivre et tu as refusé"); }
+  if (G.dialogueAvec === c) ouvrirDialogue(c, `Toi : « Suis-moi. »\n${c.nom} : « ${texte} »`);
+}
+function liberer(c, raison) {
+  if (!c.suit) return;
+  c.suit = false; c.prochain = .5;
+  if (raison) { c.bulle = { texte: raison, fin: perf() + 4000 }; if (dist(c, G.moi) < OUIE) noter("entendu", `${c.nom} : « ${raison} » — ne te suit plus.`); }
+}
+function suivre(c, dt) {   // rester à quelques pas derrière le juge
+  if (G.minute > c.suitJusqua) return liberer(c, c.loup ? "J'ai à faire, je te laisse." : "Je dois rentrer m'occuper de mes affaires.");
+  if (G.accuses.some(a => a.nom === c.nom && a.par === "le juge")) return liberer(c, "Tu m'accuses ? Je ne te suis plus.");
+  const d = dist(c, G.moi);
+  if (d > 60) { const k = (d - 45) / d; c.chemin = [{ x: c.x + (G.moi.x - c.x) * k, y: c.y + (G.moi.y - c.y) * k }]; marcher(c, Math.min(170, 80 + d) * dt); }
+  else { c.chemin = []; c.marche = false; }
+}
+async function parlerAuxPresents(texte) {
+  const presents = vivantsIA().filter(c => dist(c, G.moi) < OUIE && !c.enScene && !(G.lutte && (c === G.lutte.L || c === G.lutte.v)));
+  G.moi.bulle = { texte, fin: perf() + 5000 };
+  noter("dit", `Toi, à tous ceux qui t'entendent : « ${texte} »`);
+  ecouterAutour(G.moi, null, texte, dans(G.moi.x, G.moi.y));
+  if (!presents.length) { toast("Personne n'est assez près pour t'entendre."); return; }
+  const ENVIE = { bavard: .9, meneur: .8, emotif: .6, naif: .6, sceptique: .5, stratege: .5, parano: .3, discret: .2 };
+  const t = texte.toLowerCase();
+  const nommes = presents.filter(c => t.includes(c.nom.toLowerCase()));
+  const autres = presents.filter(c => !nommes.includes(c)).map(c => ({ c, s: (ENVIE[c.perso.id] ?? .5) + rnd() * .5 })).sort((a, b) => b.s - a.s).map(x => x.c);
+  const repondants = [...nommes, ...autres].slice(0, nommes.length ? Math.min(3, nommes.length + 1) : 2);
+  for (const c of presents) { if (c.parle) finirConv(c.parle); if (!c.suit) c.chemin = []; c.prochain = 4; }
+  G.publique = { attente: repondants.length, fin: perf() + 15000 };
+  const noms = presents.map(c => c.nom).join(", ");
+  await Promise.all(repondants.map(async (c, k) => {
+    c.attend = true; c.bulle = { texte: "…", fin: perf() + 15000 };
+    const r = propre(c, await demander(vueIA(c, `Le juge vient de dire à voix haute, à tous ceux qui sont autour de lui (${noms}) : « ${texte} ». Réponds-lui devant les autres, en une ou deux phrases${nommes.includes(c) ? " : il s'adresse à toi en particulier" : ""}.`, 35), k < 2), 35);
+    c.attend = false;
+    if (!c.vivant) return;
+    const rep = r ? r.texte : repondre(c, cleScript(texte));
+    await new Promise(res => setTimeout(res, k * 900));   // les réponses arrivent l'une après l'autre
+    c.bulle = { texte: rep, fin: perf() + 7000 };
+    ecouterAutour(c, G.moi, rep, c.lieu);
+    noter(dist(c, G.moi) < OUIE ? "reponse" : "rumeur", dist(c, G.moi) < OUIE ? `${c.nom} (devant tous) : « ${rep} »` : `${c.nom} t'a répondu, mais tu t'étais éloigné.`);
+    G.publique && G.publique.attente--;
+  }));
+  G.publique = null;
 }
 
 /* ============================================================ accusations */
@@ -843,7 +931,7 @@ function cleScript(q) {   // réponse scriptée de secours à une question libre
   const V = derniereVictime(), t = q.toLowerCase();
   if (V && t.includes(V.nom.toLowerCase()) && /avec|qui/.test(t)) return "avec";
   if (V && t.includes(V.nom.toLowerCase())) return "croise";
-  if (/nuit|entendu|bruit|pas\b/.test(t)) return "nuit";
+  if (/nuit|soir|entendu|bruit|pas\b/.test(t)) return "nuit";
   if (/soup|loup|accuse|méfie/.test(t)) return "soupcon";
   if (/où|matin|étais/.test(t)) return "matin";
   return "vus";
@@ -851,6 +939,7 @@ function cleScript(q) {   // réponse scriptée de secours à une question libre
 
 /* ============================================================ conseil autour du feu */
 function conseil() {
+  for (const c of G.ias) c.suit = false;
   G.phase = "conseil"; fermerDialogue(); G.cloche = false;
   const vivs = vivantsIA();
   vivs.forEach((c, k) => { const a = (k / vivs.length) * Math.PI * 2 - Math.PI / 2; c.x = LIEUX.place.x + Math.cos(a) * 95; c.y = LIEUX.place.y + Math.sin(a) * 70; c.chemin = []; c.parle = null; c.enScene = false; c.signe = null; c.bulle = null; });
@@ -924,6 +1013,7 @@ function majConseil(dt) {
   noter("annonce", `${c.nom} était ${c.loup ? "le Loup-Garou" : accord(c.nom, "Villageois", "Villageoise") + " (" + c.perso.label + ")"}.`);
   for (const o of vivantsIA()) evenement(o, `au conseil, le juge a éliminé ${c.nom}, qui était ${c.loup ? "le Loup-Garou" : accord(c.nom, "villageois", "villageoise")}`);
   if (c.loup) { G.sentence = null; return finir(true, `${c.nom} était le Loup-Garou. Le hameau peut dormir.`); }
+  G.credit = Math.max(-.3, G.credit - .1);   // éliminer un innocent coûte de la confiance
   majPeur(); rendreEnjeu();
   if (verifierFin()) return;
   const b = el("button", "btn fort", "Passer la nuit"); b.type = "button"; b.onclick = () => { G.sentence = null; fermerBandeau(); commencerNuit(); };
@@ -948,7 +1038,7 @@ const fermerVoile = () => { document.getElementById("voile").hidden = true; };
 
 /* ============================================================ dialogue avec le juge */
 const QUESTIONS = [["matin", "Où étais-tu ce matin ?"], ["vus", "Qui as-tu vu aujourd'hui ?"], ["croise", "As-tu croisé la dernière victime ?"], ["avec", "Qui était avec la victime ?"], ["nuit", "As-tu entendu quelque chose cette nuit ?"], ["soupcon", "Qui soupçonnes-tu ?"]];
-function ouvrirDialogue(c) {
+function ouvrirDialogue(c, messageLog) {
   G.dialogueAvec = c; G.lent = true; c.chemin = []; if (c.parle) finirConv(c.parle);
   const d = document.getElementById("dialogue"); d.replaceChildren();
   const tete = el("div", "tete"); const pa = el("span", "pastille", c.nom[0]); pa.style.background = c.couleur;
@@ -957,9 +1047,11 @@ function ouvrirDialogue(c) {
   const reste = R.accusationsJour - accusationsDuJuge();
   if (reste <= 0 || G.accuses.some(a => a.nom === c.nom)) { acc.disabled = true; acc.title = reste <= 0 ? "Tu as déjà accusé deux fois aujourd'hui." : "Déjà accusé aujourd'hui."; }
   acc.onclick = () => choisirPiece(c);
-  tete.append(pa, el("b", null, c.nom), el("span", null, c.perso.label), acc, fermer);
+  const suis = el("button", "btn", c.suit ? "Tu peux partir" : "Suis-moi"); suis.type = "button";
+  suis.onclick = () => { if (c.suit) { liberer(c, "Bien, à plus tard."); ouvrirDialogue(c); } else if (!c.attend) demanderSuivre(c); };
+  tete.append(pa, el("b", null, c.nom), el("span", null, c.perso.label + (c.suit ? " · te suit" : "")), suis, acc, fermer);
   const log = el("div", "rep"); log.id = "dlg-log";
-  log.textContent = `${c.perso.dit ? c.perso.dit.replace(/:$/, "") + "…" : "…"} Tu veux quoi ?`;
+  log.textContent = messageLog || `${c.perso.dit ? c.perso.dit.replace(/:$/, "") + "…" : "…"} Tu veux quoi ?`;
   const qs = el("div", "questions");
   const V = derniereVictime();
   for (const [k, t] of QUESTIONS) {
@@ -1017,17 +1109,24 @@ function verifierContradiction(c, k, r) {   // le carnet relève quand une répo
 /* ============================================================ boucle */
 const perf = () => performance.now();
 let derniere = perf(), cumulObs = 0;
+function majCrier() {
+  const f = document.getElementById("crier"); if (!f || !G) return;
+  const visible = G.phase === "jour" && !G.dialogueAvec && !G.scene && !G.pause && document.getElementById("voile").hidden;
+  if (f.hidden === visible) f.hidden = !visible;
+}
 function boucle() {
   const t = perf(); let dt = Math.min(.1, (t - derniere) / 1000); derniere = t;
   if (G && !G.pause && G.phase === "jour" && G.scene) avancerScene(dt);
   if (G && !G.pause && G.phase === "conseil") majConseil(dt);
   if (G && !G.pause && G.phase !== "conseil" && G.phase !== "fin") {
-    dt *= G.vitesse * (G.dialogueAvec || G.scene ? .15 : 1);
+    if (G.publique && (G.publique.attente <= 0 || perf() > G.publique.fin)) G.publique = null;
+    dt *= G.vitesse * (G.dialogueAvec || G.scene || G.publique ? .15 : 1);
     if (G.phase === "nuit") avancerNuit(dt);
     else majJour(dt);
   }
   if (G && G.flagrant && perf() > G.flagrant.fin) { G.flagrant = null; document.getElementById("arreter").hidden = true; }
   G && dessiner(t);
+  majCrier();
   requestAnimationFrame(boucle);
 }
 function majJour(dt) {
@@ -1048,6 +1147,8 @@ function majJour(dt) {
     if (G.lutte && (c === G.lutte.L || c === G.lutte.v)) continue;
     if (c.loup && G.chasse.etat !== "routine") { marcher(c, (G.chasse.etat === "filature" ? 84 : 125) * dt); continue; }
     if (c.enScene) { if (c.chemin.length) marcher(c, 110 * dt); continue; }
+    if (c.suit) { if (G.minute >= heureCloche()) liberer(c, null); else { suivre(c, dt); continue; } }
+    if (c.attend) continue;
     if (c.parle) {
       if (c.chemin.length) marcher(c, 60 * dt);
       if (c.perso.fuit && dist(c, m) < 120 && c.parle.qui === c) { c.parle.lignes = c.parle.lignes.slice(0, c.parle.k + 1); c.bulle = { texte: "… On en reparlera.", fin: perf() + 2500 }; c.cooldown = 10; finirConv(c.parle); allerA(c, pick(Object.keys(LIEUX).filter(l => l !== c.lieu))); continue; }
@@ -1255,6 +1356,7 @@ function dessiner(t) {
     const lutte = G.lutte && (c === G.lutte.L || c === G.lutte.v);
     ctx.save(); ctx.globalAlpha = c.alpha ?? 1;
     if (lutte) ctx.translate(Math.sin(t / 30 + (c.i || 0)) * 3, Math.cos(t / 37) * 2);
+    if (c.suit) { ctx.strokeStyle = "rgba(229,168,75,.9)"; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.ellipse(c.x, c.y + 10, 15, 6, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
     if (c.ruban) { ctx.strokeStyle = "#e0596f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(c.x, c.y + 10, 16, 7, 0, 0, 7); ctx.stroke(); }
     bonhomme(ctx, c, t);
     ctx.restore();
@@ -1380,7 +1482,7 @@ let hDerniere = "";
 function rendreHorloge() { const h = G.phase === "nuit" ? `Nuit ${G.jour}` : `Jour ${G.jour} · ${heure(G.minute)}`; if (h !== hDerniere) { hDerniere = h; document.getElementById("horloge").textContent = h + (G.pause ? " · pause" : ""); } }
 
 const touches = new Set();
-addEventListener("keydown", e => { if (e.target.closest("input,textarea")) return; const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(k)) e.preventDefault(); if (k === " ") { e.preventDefault(); basculerPause(); return; } if (k === "Escape") fermerDialogue(); touches.add(k); });
+addEventListener("keydown", e => { if (e.target.closest("input,textarea")) { if (e.key === "Escape") { e.target.blur(); fermerDialogue(); } return; } const k = e.key.length === 1 ? e.key.toLowerCase() : e.key; if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(k)) e.preventDefault(); if (k === " ") { e.preventDefault(); basculerPause(); return; } if (k === "Escape") fermerDialogue(); if (k === "Enter" && G && G.phase === "jour" && !G.dialogueAvec && !G.scene) { e.preventDefault(); document.getElementById("crier-texte").focus(); return; } touches.add(k); });
 addEventListener("keyup", e => { touches.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key); });
 cv.addEventListener("pointerdown", e => {
   if (!G || G.phase !== "jour") return;
@@ -1394,6 +1496,7 @@ cv.addEventListener("pointerdown", e => {
 function basculerPause() { if (!G) return; G.pause = !G.pause; document.getElementById("btn-pause").textContent = G.pause ? "Reprendre" : "Pause"; hDerniere = ""; }
 document.getElementById("btn-pause").onclick = basculerPause;
 document.getElementById("btn-vitesse").onclick = e => { G.vitesse = G.vitesse === 1 ? 2 : 1; e.target.textContent = `Vitesse ×${G.vitesse}`; };
+document.getElementById("crier").onsubmit = e => { e.preventDefault(); const i = document.getElementById("crier-texte"), t = i.value.trim(); if (!t || G.phase !== "jour") return; i.value = ""; i.blur(); parlerAuxPresents(t); };
 document.getElementById("arreter").onclick = () => { if (!G.flagrant) return; const L = G.flagrant.L; G.flagrant = null; document.getElementById("arreter").hidden = true; L.vivant = false; L.elimine = true; G.morts.push(L); noter("annonce", `Tu arrêtes ${L.nom} en flagrant délit.`); finir(true, `Flagrant délit : tu as arrêté ${L.nom} au moment où ${accord(L.nom, "il", "elle")} attaquait. C'était le Loup-Garou.`); };
 document.getElementById("btn-nouvelle").onclick = () => { fermerDialogue(); IA.file.splice(0).forEach(x => x.res(null)); nouvellePartie(); accueil(); };
 document.addEventListener("visibilitychange", () => { if (document.hidden && G && !G.pause) basculerPause(); });

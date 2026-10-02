@@ -92,3 +92,18 @@ Même artefact, version 3. Référence : `design/gdd-temps-reel.md`.
 - **Captures :** lutte vue de loin, silhouette, corps, conseil, carte de rôle.
 
 **Non vérifié :** répliques des vrais modèles pendant les scènes ; lot C (indices et rumeurs complets) et lot D (mise en scène) restent à faire.
+
+### Prototype temps réel v4 : parler à tous, « suis-moi » (03/10)
+
+Demandes du joueur : « parler à tout le monde dans son périmètre, pas juste à une personne » ; « demander à une personne de nous suivre, qui peut accepter ou refuser selon la confiance qu'elle accorde ».
+
+- **Parler aux présents :** une barre de saisie sous le village, ou la touche Entrée.
+  - Tous ceux qui sont à portée d'oreille (165) entendent et retiennent la phrase.
+  - 2 villageois répondent, 3 si tu en nommes : ceux que tu nommes d'abord, puis les plus bavards selon leur personnalité.
+  - Réponses écrites par Claude, les unes après les autres ; le temps ralentit pendant l'échange.
+- **« Suis-moi »**, dans le dialogue :
+  - **Décision :** prise par le moteur selon la confiance (0 à 1). Base par personnalité (naïf 0,85 … paranoïaque 0,2) ; − 0,6 si le juge l'a accusé dans la journée, − 0,2 s'il a défendu quelqu'un que le juge accuse ; + 0,15 si la peur est forte, + 0,3 s'il a été blessé ; − 0,1 par innocent éliminé ; − 0,3 juste après un refus.
+  - **Le loup** accepte une fois sur deux et part au bout d'une heure de jeu ; il ne chasse pas tant qu'il te suit.
+  - **Claude formule seulement** l'acceptation ou le refus.
+  - **Le suiveur** reste à quelques pas (anneau doré), deux au plus. Il part de lui-même au bout de 2 à 4 heures de jeu, si tu l'accuses, ou à la cloche. Bouton « Tu peux partir ». Les témoins retiennent « X est parti avec le juge ».
+- **Vérifié** en mode scripté et avec un faux Claude : réponses publiques, acceptations et refus, suiveurs à environ 60 unités pendant la marche, partie complète sans erreur.

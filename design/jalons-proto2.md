@@ -136,3 +136,19 @@ Demande du joueur : le loup laisse des traces pendant un laps de temps, il en es
 - **La peur** passe à un compte de points : corps découvert + 1, première découverte des traces d'une crise + 0,5, innocent éliminé + 0,5 ; la peur vaut 0 à 3. L'objectif du loup est corrigé (« deux innocents »).
 - **Le débrief** montre chaque crise : heure, stratégie, cible, raison donnée par Claude, nombre de traces.
 - **Vérifié :** 6 parties automatiques (3 scriptées, 3 avec un faux Claude), sans erreur. Stratégies variées, traces découvertes par le juge et par les villageois, partagées ou gardées, suspects déduits ; capture des traces au sol.
+
+### v6 : crise courte (04/10)
+
+Retour du joueur : les traces doivent apparaître pendant 2 ou 3 secondes réelles, pas 13.
+- **Crise :** 9 minutes de jeu, soit environ 2,6 s réelles à vitesse ×1.
+- **Préparation :** le loup se met en place pendant les 40 minutes de jeu qui précèdent (environ 12 s) :
+  - il rejoint le lieu isolé ;
+  - il se colle à sa cible ;
+  - il attend près de la maison visée, puis fait les derniers pas jusqu'à la porte pendant la crise ;
+  - il attend dans un lieu voisin du piège, puis y entre pendant la crise.
+- **Traces :** une tous les 30 unités parcourues ou toutes les 2,5 minutes de jeu, soit 4 à 8 par crise.
+- **Mesuré, par stratégie :**
+  - s'éloigner : 4 traces, toutes dans le lieu isolé ;
+  - accuser : 6 traces, la plus proche à 58 unités de la cible ;
+  - fausse piste : 8 traces, finissant à 42 unités de la maison ;
+  - piège : 8 traces menant au lieu.

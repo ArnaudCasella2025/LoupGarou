@@ -503,7 +503,7 @@ function chasser(dt) {
   if (!L.vivant) return;
   if (C.etat === "lutte") return avancerLutte(dt);
   if (C.etat === "fuite") { if (!L.chemin.length) finirFuite(); return; }
-  const bloque = G.jour < 2 || G.mortDuJour || G.essais >= R.essaisMax || G.minute < R.debutChasse || G.minute > R.finChasse || G.scene || G.dialogueAvec === L || L.enScene || L.suit || (G.crise && G.crise.phase === "active");
+  const bloque = G.jour < 2 || G.mortDuJour || G.essais >= R.essaisMax || G.minute < R.debutChasse || G.minute > R.finChasse || G.scene || G.dialogueAvec === L || L.enScene || L.suit || criseEnCours();
   if (bloque) { if (C.etat !== "routine") { C.etat = "routine"; L.chemin = []; } return; }
   C.t += dt;
   if (C.etat === "routine") {
@@ -640,18 +640,19 @@ const TYPES_TRACE = ["empreintes de pattes", "touffe de poils gris", "griffures 
 const PARTAGE = { meneur: .85, parano: .3, discret: .3, bavard: .95, sceptique: .5, emotif: .75, stratege: .4, naif: .85 };
 function planifierCrise(jour) {
   const debut = 9 * 60 + Math.floor(rnd() * 7 * 60);   // entre 9h et 16h
-  return { id: `${jour}-${debut}`, jour, debut, duree: 45, phase: "attente", strategie: null, cible: null, raison: null, decision: false, dernier: null, dernierMin: 0, nb: 0, decouverte: false, annonce: false };
+  return { id: `${jour}-${debut}`, jour, debut, duree: 9, phase: "attente", strategie: null, cible: null, raison: null, decision: false, dernier: null, dernierMin: 0, nb: 0, decouverte: false, annonce: false };
 }
+const criseEnCours = () => G.crise && (G.crise.phase === "active" || G.crise.phase === "preparation");
 function texteCrise() {
   const K = G.crise; if (!K || K.phase === "finie") return "";
-  return `\nTA CRISE D'AUJOURD'HUI : vers ${heureDite(K.debut)}, pendant environ 45 minutes, tu laisseras malgré toi des traces (empreintes de pattes, poils, griffures) partout où tu passeras. Elles n'apparaissent aux yeux des autres qu'un peu plus tard ; celui qui les trouve peut deviner l'heure et chercher qui était là.${K.strategie ? ` Ta stratégie : ${STRATEGIES[K.strategie]}${K.cible ? ` (${K.cible})` : ""}.` : ""}`;
+  return `\nTA CRISE D'AUJOURD'HUI : vers ${heureDite(K.debut)}, pendant quelques minutes, tu laisseras malgré toi des traces (empreintes de pattes, poils, griffures) partout où tu passeras. Elles n'apparaissent aux yeux des autres qu'un peu plus tard ; celui qui les trouve peut deviner l'heure et chercher qui était là.${K.strategie ? ` Ta stratégie : ${STRATEGIES[K.strategie]}${K.cible ? ` (${K.cible})` : ""}.` : ""}`;
 }
 function ecartLePlusVide(L) {
   return ECARTS.map(l => ({ l, n: vivantsIA().filter(o => o !== L && dist(o, LIEUX[l]) < 300).length + (dist(G.moi, LIEUX[l]) < 450 ? 2 : 0) })).sort((a, b) => a.n - b.n)[0].l;
 }
 async function deciderStrategie(K, L) {
   const noms = vivantsIA().filter(o => !o.loup).map(o => o.nom);
-  const tache = `Dans environ une heure, vers ${heureDite(K.debut)}, ta crise de loup va te prendre pendant environ 45 minutes : tu laisseras malgré toi des traces partout où tu passeras. Elles ne seront visibles qu'un peu plus tard ; ceux qui les trouveront pourront deviner l'heure et se demander qui était là. Choisis ta stratégie :
+  const tache = `Dans environ une heure, vers ${heureDite(K.debut)}, ta crise de loup va te prendre pendant quelques minutes : tu laisseras malgré toi des traces là où tu seras à ce moment-là. Elles ne seront visibles qu'un peu plus tard ; ceux qui les trouveront pourront deviner l'heure et se demander qui était là. Choisis ta stratégie :
 - "eloigner" : t'isoler loin de tout le monde pour que personne ne puisse faire le lien ;
 - "accuser" : rester collé à quelqu'un pour que les traces apparaissent près de lui (cible : son prénom) ;
 - "fausse_piste" : marcher jusqu'à la maison de quelqu'un pour que la piste mène chez lui (cible : son prénom) ;
@@ -677,22 +678,31 @@ function allerVersMaison(c, maison) {
   const depart = dans(c.x, c.y) || lieuProche(c.x, c.y);
   c.chemin = cheminNoeuds(depart, maison.id).slice(1).map(n => ({ x: NOEUDS[n].x + (rnd() - .5) * 16, y: NOEUDS[n].y + (rnd() - .5) * 16 }));
 }
-function lancerStrategie(K, L) {
+function preparer(K, L) {   // se mettre en place avant la crise
   if (L.parle) finirConv(L.parle);
   if (L.suit) liberer(L, "Je dois m'absenter un moment.");
   if (K.strategie === "eloigner") { K.lieuIsole = ecartLePlusVide(L); allerA(L, K.lieuIsole); }
-  else if (K.strategie === "fausse_piste") { const o = parNom(K.cible); if (o && o.vivant) allerVersMaison(L, o.maison); else { K.strategie = "eloigner"; allerA(L, ecartLePlusVide(L)); } }
-  else if (K.strategie === "piege") allerA(L, K.lieuPiege || ecartLePlusVide(L));
+  else if (K.strategie === "fausse_piste") { const o = parNom(K.cible); if (o && o.vivant) allerA(L, o.maison.lieu); else { K.strategie = "eloigner"; K.cible = null; allerA(L, ecartLePlusVide(L)); } }
+  else if (K.strategie === "piege") { K.lieuPiege ||= ecartLePlusVide(L); const avant = NOEUDS[K.lieuPiege].v.find(n => LIEUX[n] && n !== "place") || "place"; allerA(L, avant); }
   G.crises.push(K);
+}
+function lancerStrategie(K, L) {   // la crise commence : les derniers pas laissent la piste
+  if (K.strategie === "fausse_piste") { const o = parNom(K.cible); if (o && o.vivant) allerVersMaison(L, o.maison); }
+  else if (K.strategie === "piege") allerA(L, K.lieuPiege);
 }
 function majCrise(dt) {
   const K = G.crise, L = loupDe(); if (!K || !L.vivant || G.phase !== "jour") return;
   if (K.phase === "attente") {
     if (!K.decision && G.minute >= K.debut - 75) { K.decision = true; deciderStrategie(K, L); }
-    if (G.minute >= K.debut && G.chasse.etat !== "lutte" && G.chasse.etat !== "fuite") {
-      K.phase = "active"; if (!K.strategie) strategieScript(K, L);
-      lancerStrategie(K, L); K.dernier = { x: L.x, y: L.y }; K.dernierMin = G.minute;
+    if (G.minute >= K.debut - 40 && G.chasse.etat !== "lutte" && G.chasse.etat !== "fuite") {
+      K.phase = "preparation"; if (!K.strategie) strategieScript(K, L);
+      preparer(K, L);
     }
+    return;
+  }
+  if (K.phase === "preparation") {
+    if (K.strategie === "accuser") { const o = parNom(K.cible); if (o && o.vivant) L.chemin = dist(L, o) > 40 ? [{ x: o.x - 26, y: o.y + 12 }] : []; }
+    if (G.minute >= K.debut) { K.phase = "active"; lancerStrategie(K, L); K.dernier = { x: L.x, y: L.y }; K.dernierMin = G.minute - 99; deposerSiBouge(K, L); }
     return;
   }
   if (K.phase === "active") {
@@ -719,7 +729,7 @@ function majCrise(dt) {
 }
 function deposerSiBouge(K, L) {
   const bouge = Math.hypot(L.x - K.dernier.x, L.y - K.dernier.y);
-  if (bouge < 38 && G.minute - K.dernierMin < 9) return;
+  if (bouge < 30 && G.minute - K.dernierMin < 2.5) return;
   K.dernier = { x: L.x, y: L.y }; K.dernierMin = G.minute; K.nb++;
   const a = rnd() * 7;
   G.tracesLoup.push({ x: L.x + Math.cos(a) * 10, y: L.y + 14 + Math.sin(a) * 6, jour: G.jour, minute: G.minute, lieu: dans(L.x, L.y), type: pick(TYPES_TRACE), crise: K.id,
@@ -1296,7 +1306,7 @@ function majJour(dt) {
     if (c === G.dialogueAvec) continue;
     if (G.lutte && (c === G.lutte.L || c === G.lutte.v)) continue;
     if (c.loup && G.chasse.etat !== "routine") { marcher(c, (G.chasse.etat === "filature" ? 84 : 125) * dt); continue; }
-    if (c.loup && G.crise && G.crise.phase === "active") { marcher(c, 88 * dt); continue; }
+    if (c.loup && criseEnCours()) { marcher(c, 88 * dt); continue; }
     if (c.enScene) { if (c.chemin.length) marcher(c, 110 * dt); continue; }
     if (c.suit) { if (G.minute >= heureCloche()) liberer(c, null); else { suivre(c, dt); continue; } }
     if (c.attend) continue;
@@ -1333,7 +1343,7 @@ function marcher(c, v) {
   c.marche = c.chemin.length > 0;
 }
 function lancerConversations() {
-  const libres = vivantsIA().filter(c => c.lieu && !c.parle && !c.chemin.length && c.cooldown <= 0 && c !== G.dialogueAvec && !c.enScene && !(c.loup && G.chasse.etat !== "routine") && !(c.loup && G.crise && G.crise.phase === "active") && !(G.lutte && c === G.lutte.v));
+  const libres = vivantsIA().filter(c => c.lieu && !c.parle && !c.chemin.length && c.cooldown <= 0 && c !== G.dialogueAvec && !c.enScene && !(c.loup && G.chasse.etat !== "routine") && !(c.loup && criseEnCours()) && !(G.lutte && c === G.lutte.v));
   for (const a of libres) {
     if (a.parle || rnd() > .12) continue;
     const b = libres.find(o => o !== a && !o.parle && o.lieu === a.lieu && dist(o, a) < 110);

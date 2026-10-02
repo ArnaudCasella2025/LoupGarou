@@ -107,3 +107,32 @@ Demandes du joueur : « parler à tout le monde dans son périmètre, pas juste 
   - **Claude formule seulement** l'acceptation ou le refus.
   - **Le suiveur** reste à quelques pas (anneau doré), deux au plus. Il part de lui-même au bout de 2 à 4 heures de jeu, si tu l'accuses, ou à la cloche. Bouton « Tu peux partir ». Les témoins retiennent « X est parti avec le juge ».
 - **Vérifié** en mode scripté et avec un faux Claude : réponses publiques, acceptations et refus, suiveurs à environ 60 unités pendant la marche, partie complète sans erreur.
+
+### Prototype temps réel v5 : crise du loup et traces (04/10)
+
+Demande du joueur : le loup laisse des traces pendant un laps de temps, il en est prévenu et choisit comment en jouer (s'éloigner, faire accuser quelqu'un, fausse piste, piège). Les découvertes font monter la peur. Celui qui trouve des traces en déduit des suspects avec l'heure d'apparition et les récits des autres, et choisit de partager ou de garder sa trouvaille. Les gens près desquels les traces apparaissent ne les voient pas tout de suite. Le loup dévore les isolés et laisse un cadavre, ce qui fait aussi monter la peur.
+
+- **La crise :** une par jour, jour 1 compris, à une heure tirée entre 9h et 16h, pendant 45 minutes de jeu.
+  - **Le choix de la stratégie :** 75 minutes avant, l'IA du loup est prévenue. Elle choisit par Claude (un appel prioritaire, réponse en JSON avec stratégie, cible et raison) ; repli scripté sinon.
+  - **Les stratégies :**
+    - s'éloigner vers le lieu à l'écart le plus vide ;
+    - accuser : se coller à une personne ;
+    - fausse piste : marcher jusqu'à la maison d'une personne ;
+    - piège : attendre dans un lieu isolé, et dévorer qui y arrive seul, à partir du jour 2.
+  - **Pendant la crise**, la prochaine heure de crise et la stratégie figurent dans la vue du loup.
+- **Les traces :** empreintes, poils, griffures, terre retournée, déposées en marchant ou en attendant.
+  - Elles deviennent visibles 25 à 60 minutes de jeu plus tard.
+  - Les personnes à moins de 130 au moment de l'apparition, juge compris, ne peuvent pas les remarquer le jour même.
+  - Elles restent jusqu'au lendemain.
+- **La découverte :**
+  - **Le juge** (à 80) : entrée « indice » avec le lieu et une fenêtre d'apparition d'environ 40 minutes, et la trace dessinée au sol.
+  - **Un villageois** (à 55) :
+    - il retient la trace, la fenêtre horaire et les gens qu'il avait vus par là à cette heure ;
+    - selon sa personnalité (bavard 0,95 … paranoïaque 0,3), il la crie ou la garde ;
+    - gardée, il ne la révèle qu'à quelqu'un en qui il a confiance (seuil 0,55 en scripté ; consigne dans la vue pour Claude) ;
+    - partagée, elle circule dans les conversations.
+  - **Le loup en stratégie « accuser »** fait mine de découvrir ses traces et désigne sa cible.
+  - **Nouvelle question** dans le dialogue : « As-tu trouvé des traces ? ».
+- **La peur** passe à un compte de points : corps découvert + 1, première découverte des traces d'une crise + 0,5, innocent éliminé + 0,5 ; la peur vaut 0 à 3. L'objectif du loup est corrigé (« deux innocents »).
+- **Le débrief** montre chaque crise : heure, stratégie, cible, raison donnée par Claude, nombre de traces.
+- **Vérifié :** 6 parties automatiques (3 scriptées, 3 avec un faux Claude), sans erreur. Stratégies variées, traces découvertes par le juge et par les villageois, partagées ou gardées, suspects déduits ; capture des traces au sol.

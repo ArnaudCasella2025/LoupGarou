@@ -152,3 +152,31 @@ Retour du joueur : les traces doivent apparaître pendant 2 ou 3 secondes réell
   - accuser : 6 traces, la plus proche à 58 unités de la cible ;
   - fausse piste : 8 traces, finissant à 42 unités de la maison ;
   - piège : 8 traces menant au lieu.
+
+### v7 : outils de développement (05/10)
+
+Demande du joueur : un mode debug qui enregistre les décisions de chaque PNJ, et un export JSON de la partie à renvoyer dans la conversation pour analyser les comportements et équilibrer.
+- **Bouton « Debug »** (en-tête), activable et désactivable à tout moment ; le choix est mémorisé dans le navigateur.
+  - Chaque PNJ tient un journal de ses décisions : quand, type, état (lieu, destination, peur, confiance envers le juge, rencontres du jour, suit le juge, en scène, accusé, blessé ; pour le loup : état de chasse, phase de crise, essais, a tué), objectif, options considérées, choix, raison.
+  - Plafond : 1 500 décisions par PNJ ; les plus anciennes sont alors perdues, et comptées.
+  - Rien ne s'affiche à l'écran, hormis le compteur sur le bouton : le journal ne trahit pas le loup pendant la partie.
+- **Décisions notées :**
+  - déplacement : routine, hasard, peur, loup en quête de rencontres, cloche ;
+  - conversation : avec qui, sujet, silence, fuite du méfiant ;
+  - chasse du loup : empêchements, proies retenues ou écartées et pourquoi, filature, freins, attaque, abandon, issue de la lutte, fuite ;
+  - crise : stratégie choisie par Claude ou tirée, mise en place, piège, fausse découverte ;
+  - nuit : victime du loup ;
+  - traces : partager ou garder ;
+  - « suis-moi » : confiance et tirage ;
+  - accusations des IA ;
+  - avis des témoins et mains levées au conseil, avec le détail des scores ;
+  - réponses : Claude ou script, question, texte, mensonge scripté du loup ;
+  - réactions aux cris et aux corps.
+- **Bouton « Exporter les données »** (en-tête et écran de fin) : un fichier JSON contenant
+  - les réglages ;
+  - la partie : issue, loup, peur, stats de chasse, victimes, éliminés, crises, traces, accusations, conseils avec mains levées et défenses ;
+  - le compte des appels IA ;
+  - pour chaque personnage : rôle, personnalité, rencontres, nuits, événements, paroles entendues, journal de décisions ;
+  - le carnet complet du juge.
+  - Il passe par la capacité `downloads` de l'artefact (le visiteur confirme), sinon par un téléchargement ordinaire.
+  - Il contient les rôles : à ouvrir après la partie.

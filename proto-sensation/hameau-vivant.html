@@ -1175,6 +1175,7 @@ function basculerDebug() {
   DBG.actif = !DBG.actif;
   try { localStorage.setItem("hameau-debug", DBG.actif ? "1" : "0"); } catch {}
   if (G) G.debug.bascules.push({ quand: `J${G.jour} ${heure(G.minute)}`, actif: DBG.actif });
+  if (G && DBG.actif) { for (const c of G.ias) { c.dbgChasse = c.dbgCands = undefined; c.dbgAcc = null; } G.chasse.freinCle = undefined; }   // les états déjà vus debug coupé doivent être renotés
   majBoutonDebug();
   toast(DBG.actif ? "Mode debug : les villageois notent leurs décisions." : "Mode debug coupé.");
 }
@@ -1504,10 +1505,12 @@ async function converserParClaude(cv) {
   const r1 = propre(a, await demander(vueIA(a, `Tu croises ${b.nom} ${ou}. Dis-lui une seule chose : ce que tu as vu, une question sur la nuit ou la victime, ou un soupçon.`, 28)), 28);
   if (cv.fini) return;
   const t1 = r1 ? r1.texte : (conversation(a, b) || [[a, pick(REACTIONS)]])[0][1];
+  decision(a, "reponse", `parler à ${b.nom}`, ["Claude", "script"], r1 ? "Claude" : "script", `dit : « ${t1} »${r1 && r1.vise ? ` ; vise ${r1.vise}` : ""}`);
   cv.lignes.push([a, t1]);
   const r2 = propre(b, await demander(vueIA(b, `${a.nom} vient de te dire ${ou} : « ${t1} ». Réponds-lui.`, 28)), 28);
   if (cv.fini) return;
   cv.lignes.push([b, r2 ? r2.texte : pick(REACTIONS)]);
+  decision(b, "reponse", `répondre à ${a.nom}`, ["Claude", "script"], r2 ? "Claude" : "script", `dit : « ${cv.lignes.at(-1)[1]} »${r2 && r2.vise ? ` ; vise ${r2.vise}` : ""}`);
   cv.attente = false;
 }
 function avancerConv(cv, dt) {

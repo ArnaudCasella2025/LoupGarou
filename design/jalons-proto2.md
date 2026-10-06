@@ -198,3 +198,21 @@ Demande du joueur : un mode debug qui enregistre les décisions de chaque PNJ, e
   - Le loup peut promettre sans y aller.
   - Le journal note chaque promesse, tenue ou non, y compris un « j'y vais » sans lieu, signalé comme une promesse en l'air.
 - **Journal :** la question libre du juge est notée « libre » quand Claude répond, au lieu de la catégorie du script.
+
+### v7.3 : l'aube du mouton, et des traces lisibles (06/10)
+
+Demande du joueur : les empreintes visibles dès le lancement l'intriguaient. Il demande une piste du prologue moins révélatrice et des traces bien distinctes, des traces signalées qui s'affichent, et une ouverture où quelqu'un découvre la piste, pour que le joueur comprenne et que les villageois fassent le lien avec le mouton.
+
+- **L'ouverture :**
+  - Le premier villageois levé, parmi les innocents (bavard d'abord, puis émotif, meneur…), part de la bergerie. Il court jusqu'au feu et crie la nouvelle vers 7h15.
+  - Tant que la nouvelle n'est pas arrivée, les autres restent au feu, et la vue des IA ne parle pas encore du mouton.
+  - Ceux qui l'entendent retiennent le lien : mouton égorgé, piste vers la Grange, « un loup… ou l'un d'entre nous ».
+  - Une flèche montre la piste au juge.
+  - Chaque présent décide d'aller voir ou non, trois au plus. Les probabilités vont du sceptique (0,8) à l'émotif (0,25) ; le loup y va une fois sur deux.
+  - Ceux qui passent sur la piste la voient et commentent à voix haute. Le loup minimise : « un gros chien ».
+  - Le premier jour, la piste devient aussi un sujet de conversation.
+- **La piste du prologue** ne garde que les abords de la bergerie, sur 270 : elle ne pointe plus vers le quartier du loup.
+- **Lisibilité :**
+  - Les pistes de nuit sont plus discrètes. Quand le juge passe dessus, une entrée « indice » au carnet dit ce que c'est.
+  - Les traces de crise sont plus grandes et cerclées d'un pointillé couleur lanterne.
+- **Traces signalées :** quand un villageois montre ses traces sous les yeux du juge, ou que le loup fait mine d'en découvrir, elles s'affichent sur la carte du juge, avec une flèche si elles sont loin.

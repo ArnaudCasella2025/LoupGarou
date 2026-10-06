@@ -14,6 +14,7 @@
   --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   color-scheme: dark;
 }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body { background: var(--bg); color: var(--ink); font: 16px/1.4 var(--f-body); }
 button { font: inherit; color: inherit; cursor: pointer; }
@@ -234,16 +235,25 @@ function nouvellePartie() {
     historique: { accusations: [], conseils: [] }, carnetComplet: [], debug: { total: 0, bascules: DBG.actif ? [{ quand: "J1 07:00", actif: true }] : [], debutReel: perf() },
     convs: [], cloche: false, journal: [], vuParMoi: new Set(), sons: [], silhouette: null, nuit: null, loupMarche: null, dialogueAvec: null, fin: null, flammes: 0 };
   // placer tout le monde autour du feu
-  ias.forEach((c, k) => { const a = (k / 7) * Math.PI * 2; c.x = LIEUX.place.x + Math.cos(a) * 75; c.y = LIEUX.place.y + Math.sin(a) * 55; c.prochain = 1 + rnd() * 3; });
-  // prologue : nuit 0, le loup égorge un mouton à la bergerie
+  // tout le monde autour du feu ; on y reste le temps que la nouvelle arrive
+  ias.forEach((c, k) => { const a = (k / 7) * Math.PI * 2; c.x = LIEUX.place.x + Math.cos(a) * 75; c.y = LIEUX.place.y + Math.sin(a) * 55; c.prochain = 7 + rnd() * 4; });
+  // prologue : nuit 0, le loup égorge un mouton à la bergerie. Seuls les abords de la bergerie gardent la piste : elle ne dit pas d'où il venait.
   const l = ias[loup], pts = tracerChemin(cheminNoeuds(l.maison.id, "bergerie"));
   temoinsNuit(pts, null);
-  G.traces.push({ pts: pts.slice(Math.floor(pts.length * .45)), matiere: "boue", jour: 1 });
+  G.traces.push({ pts: pts.filter(p => Math.hypot(p.x - BERGERIE.x, p.y - BERGERIE.y) < 270), matiere: "boue", jour: 1, prologue: true,
+    texte: "Des empreintes de loup dans la boue, entre la bergerie et la Grange : la piste de la bête qui a égorgé le mouton cette nuit. Elles se perdent sur le chemin, avant la Grange." });
   G.victimes.push({ nom: "un mouton", jour: 0 });
   G.crise = planifierCrise(1);
-  noter("annonce", "Jour 1, aube. Un mouton a été égorgé cette nuit à la bergerie, près de la lisière. Des empreintes de loup repartent vers le village.");
+  // le premier levé est passé par la bergerie : il revient en courant l'annoncer au feu
+  const ORDRE = ["bavard", "emotif", "meneur", "naif", "sceptique", "stratege", "discret", "parano"];
+  const dec = ias.filter(c => !c.loup).sort((a, b) => ORDRE.indexOf(a.perso.id) - ORDRE.indexOf(b.perso.id))[0];
+  Object.assign(dec, { x: BERGERIE.x + 60, y: BERGERIE.y - 50, court: true });
+  dec.chemin = tracerChemin(["bergerie", "grange", "place"]).filter((p, i) => i % 4 === 0).map(p => ({ x: p.x, y: p.y })).concat({ x: LIEUX.place.x - 30, y: LIEUX.place.y - 50 });
+  dec.but = "place"; dec.empreintesVues = true;
+  evenement(dec, "à l'aube, en passant par la bergerie, tu as trouvé un mouton égorgé et des empreintes de loup qui partent vers la Grange ; tu cours l'annoncer au village");
+  G.prologue = { par: dec.nom, annonce: false };
+  noter("annonce", "Jour 1, aube. Le village se réveille autour du feu de la Place.");
   noter("annonce", "Le Loup se cache parmi les sept villageois. Il chasse de jour, à l'écart, et ne peut tuer que quelqu'un qu'il a croisé dans la journée. Accuse devant témoins ; au conseil du soir, élimine un accusé. S'il ne reste que deux innocents, le Loup gagne.");
-  toast("Jour 1 — un mouton égorgé à la bergerie. Promène-toi, écoute, interroge.");
   rendreEnjeu(); rendreJournal(); majBoutonDebug();
 }
 
@@ -296,6 +306,51 @@ function choisirLieu(c, note = {}) {   // note : rempli pour le journal de debug
 }
 const rencontresDuJour = (c, jour = G.jour) => c.vu.filter(v => v.jour === jour && parNom(v.qui)?.vivant);
 
+/* ============================================================ prologue : la nouvelle du mouton */
+const VOIR = { sceptique: .8, stratege: .7, meneur: .6, bavard: .5, naif: .5, discret: .4, parano: .3, emotif: .25 };
+const pisteProlo = () => G.traces.find(t => t.prologue);
+function annoncerMouton(d) {   // le découvreur arrive au feu et raconte ; chacun décide d'aller voir ou non
+  G.prologue.annonce = true; d.court = false; d.prochain = 6;
+  const texte = "Le mouton de la bergerie a été égorgé cette nuit ! Et il y a des empreintes de loup, de la bergerie vers la Grange !";
+  d.bulle = { texte, fin: perf() + 7000 };
+  ecouterAutour(d, null, texte, "place");
+  for (const o of vivantsIA()) if (o !== d && dist(o, d) < R.cri) evenement(o, `${d.nom} est arrivé${accord(d.nom, "", "e")} en courant de la bergerie : le mouton a été égorgé cette nuit, et des empreintes de loup vont de la bergerie vers la Grange. Un loup… ou l'un d'entre nous`);
+  if (dist(G.moi, d) < R.cri) {
+    noter("cri", `${d.nom} arrive en courant de la bergerie : « ${texte} »`);
+    toast(`${d.nom} : « Le mouton a été égorgé ! Des empreintes de loup vers la Grange ! »`);
+    const P = pisteProlo(); if (P) { const m = P.pts[Math.floor(P.pts.length / 2)]; G.fleche = { x: m.x, y: m.y, fin: perf() + 9000 }; }
+  }
+  const REAGIR = ["Un loup ? Chez nous ?", "Qui a pu laisser faire ça…", "Il faut aller voir ces empreintes.", "Un chien errant, peut-être.", "Je n'aime pas ça du tout."];
+  let partis = 0;
+  for (const o of melange(vivantsIA().filter(o => o !== d && dist(o, d) < R.cri))) {
+    const p = o.loup ? .5 : VOIR[o.perso.id] ?? .5, va = partis < 3 && rnd() < p;
+    decision(o, "reaction", "réagir à la nouvelle du mouton", [`aller voir les empreintes (${Math.round(p * 100)} %)`, "rester au feu"], va ? "aller voir les empreintes" : "rester au feu", o.loup ? "loup : y aller fait paraître concerné, rester évite la piste" : `curiosité (${o.perso.id}) ; déjà en route : ${partis} sur 3 au plus`);
+    if (va) { partis++; allerVoirPiste(o); o.bulle = { texte: pick(["Je vais voir ça.", "Montre-moi ces empreintes.", "J'y vais."]), fin: perf() + 3500 }; }
+    else if (rnd() < .4) o.bulle = { texte: pick(REAGIR), fin: perf() + 3500 };
+  }
+}
+function allerVoirPiste(o) {
+  const P = pisteProlo(); if (!P) return;
+  const m = P.pts[Math.floor(P.pts.length * (.3 + rnd() * .4))];
+  allerA(o, "grange"); o.chemin.push({ x: m.x + (rnd() - .5) * 20, y: m.y + (rnd() - .5) * 20 }); o.but = null; o.prochain = 4;
+}
+function regarderPistes() {   // qui passe sur une piste de nuit la voit : le juge la note, un villageois la retient
+  for (const P of G.traces) {
+    if (!P.texte) continue;
+    if (!P.vueJuge && P.pts.some(p => dist(p, G.moi) < 45)) { P.vueJuge = true; noter("indice", P.texte); toast(P.prologue ? "Les empreintes du loup qui a égorgé le mouton." : `Empreintes de ${P.matiere} : la piste du loup cette nuit.`); }
+    if (!P.prologue) continue;
+    for (const o of vivantsIA()) {
+      if (o.empreintesVues || !P.pts.some(p => dist(p, o) < 45)) continue;
+      o.empreintesVues = true;
+      evenement(o, "tu as vu de tes yeux les empreintes de loup entre la bergerie et la Grange : ce sont bien des pattes de loup, et elles se perdent sur le chemin, avant le village");
+      const t = o.loup ? pick(["Des pattes de loup… ou d'un gros chien.", "Ça pourrait être n'importe quelle bête."]) : pick(["Ce sont bien des pattes de loup.", "Elles s'arrêtent avant le village… il est parmi nous.", "Le mouton, puis ça. Ça ne va pas s'arrêter là."]);
+      o.bulle = { texte: t, fin: perf() + 4500 }; ecouterAutour(o, null, t, dans(o.x, o.y));
+      if (dist(G.moi, o) < OUIE) noter("entendu", `${o.nom}, devant les empreintes : « ${t} »`);
+      decision(o, "trace", "examiner les empreintes du mouton", null, "les a vues", t);
+    }
+  }
+}
+
 /* ============================================================ mémoire et perception */
 function observer() {
   const ias = vivantsIA();
@@ -307,6 +362,7 @@ function observer() {
   if (G.phase !== "jour") return;
   decouvrirCorps();
   decouvrirTraces();
+  regarderPistes();
   accusationsIA();
   // ce que le juge voit : quelqu'un dans un lieu, dans son champ de vision
   for (const c of ias) {
@@ -398,6 +454,12 @@ function conversation(a, b) {
     dire(b, pick(["Tu en es sûr ?", "Il faut le dire au juge.", "Ça me glace le sang.", "Et toi, tu faisais quoi là-bas ?"]));
     L.sujet = "partager ses traces (50 %)"; return L;
   }
+  if (G.jour === 1 && a.empreintesVues && !a.loup && rnd() < .35) {
+    dire(a, phrase(a.perso.dit, pick(["j'ai vu les empreintes près de la bergerie. C'est un loup, pas un chien.", "les empreintes s'arrêtent avant la Grange. Il est rentré au village, j'en suis sûr.", "le mouton d'abord… et la prochaine fois, ce sera l'un de nous."])));
+    dire(b, pick(["Tu me fais peur.", "Alors il est parmi nous.", "Ça ne prouve rien.", "Il faut en parler au juge."]));
+    L.sujet = "les empreintes du mouton";
+    return L;
+  }
   if (V && r < .45) {
     dire(a, phrase(a.perso.dit, `tu as croisé ${V.nom}, ${V.quand} ?`));
     dire(b, repondre(b, "croise"));
@@ -472,7 +534,7 @@ function aube() {
     G.victimes.push({ nom: v.nom, ia: true, jour: G.jour - 1, maison: v.maison, matiere: N.matiere, quand: "la veille de sa mort", connu: true, nuit: true });
     G.morts.push(v);
     temoinsNuit(N.pts, v);
-    G.traces = [{ pts: N.pts.slice(Math.floor(N.pts.length * .55)), matiere: N.matiere, jour: G.jour }];
+    G.traces = [{ pts: N.pts.slice(Math.floor(N.pts.length * .55)), matiere: N.matiere, jour: G.jour, texte: `Des empreintes de ${N.matiere} sur le chemin : la piste du loup cette nuit, jusqu'au seuil de ${v.nom}. ${cap(lieuDeTrace(N.matiere))} laisse cette marque.` }];
   } else G.traces = [];
   for (const k of oublies) { const vic = G.victimes.find(x => x.nom === k.nom); if (vic) vic.connu = true; for (const o of vivantsIA()) evenement(o, `on a retrouvé ce matin le corps de ${k.nom} ${LIEUX[k.lieu].a}`); }
   G.corps = [];
@@ -785,8 +847,12 @@ function majCrise(dt) {
     decision(L, "crise", `faire soupçonner ${o.nom}`, null, "« découvrir » ses propres traces", `stratégie accuser : montre la trace ${ouEst(tr)}`);
     L.bulle = { texte, fin: perf() + 6000 };
     ecouterAutour(L, null, texte, L.lieu);
-    if (dist(G.moi, L) < OUIE) noter("entendu", `${L.nom} : « ${texte} »`);
+    if (dist(G.moi, L) < OUIE) { noter("entendu", `${L.nom} : « ${texte} »`); signalerTraces(tr); }
   }
+}
+function signalerTraces(tr) {   // quelqu'un montre les traces devant le juge : elles apparaissent sur sa carte, avec une flèche si elles sont loin
+  for (const t of G.tracesLoup) if (t.crise === tr.crise && dist(t, tr) < 140) t.signalee = true;
+  if (dist(G.moi, tr) > VUE * .8) G.fleche = { x: tr.x, y: tr.y, fin: perf() + 7000 };
 }
 function piegeTendu(K, L) {   // pendant la crise ou le guet : dévorer qui arrive seul au piège
   if (K.strategie !== "piege" || G.jour < 2 || G.mortDuJour || G.lutte || G.essais >= R.essaisMax) return false;
@@ -839,6 +905,7 @@ function decouvrirTraces() {
         ecouterAutour(c, null, texte, c.lieu);
         if (dist(G.moi, c) < OUIE) noter("entendu", `${c.nom} : « ${texte} »`);
         else if (dist(G.moi, c) < VUE) noter("rumeur", `${c.nom} montre quelque chose au sol, ${ouEst(c)}.`);
+        if (dist(G.moi, c) < VUE) signalerTraces(tr);
       }
     }
   }
@@ -1120,7 +1187,7 @@ function vueIA(c, tache, maxMots, format) {
   const faits = [
     `- ${quand(G.jour)}, vers ${heureDite(G.minute)}. Tu es ${c.lieu ? LIEUX[c.lieu].a : "sur un chemin du hameau"}.`,
     `- Vivants : ${vivants}, et le juge.`,
-    `- Morts : ${[...victimes, ...elimines].join(" ; ") || "aucun pour l'instant"}. La première nuit, le Loup a égorgé un mouton à la bergerie.`,
+    `- Morts : ${[...victimes, ...elimines].join(" ; ") || "aucun pour l'instant"}. ${!G.prologue || G.prologue.annonce || c.loup || c.empreintesVues ? " La première nuit, le Loup a égorgé un mouton à la bergerie." : ""}`,
     ...(V && V.matiere ? [`- Ce matin, des traces de ${V.matiere} sur le seuil de ${V.nom} : ${lieuDeTrace(V.matiere)} laisse cette marque.`] : []),
     `- Règles : le Loup tue une fois par jour, de préférence à l'écart et de jour, quelqu'un qu'il a croisé. Le juge accuse devant témoins et élimine un accusé au conseil du soir. Il reste ${innocentsVivants()} innocents ; à deux, le Loup gagne.`,
     ...(G.accuses.length ? [`- Accusés aujourd'hui : ${G.accuses.map(a => `${a.nom} (par ${a.par})`).join(", ")}.`] : []),
@@ -1238,7 +1305,7 @@ function donneesPartie() {
       loup: loup.nom, peur: G.peur, peurPoints: G.peurPoints, creditJuge: G.credit, stats: G.stats,
       victimes: G.victimes, elimines: G.morts.filter(m => m.elimine).map(m => ({ nom: m.nom, loup: m.loup })),
       crises: G.crises.map(k => ({ jour: k.jour, debut: heure(k.debut), strategie: k.strategie, cible: k.cible, raison: k.raison, parClaude: !!k.parClaude, traces: k.nb, decouverte: k.decouverte })),
-      traces: G.tracesLoup.map(t => ({ jour: t.jour, heure: heure(t.minute), lieu: t.lieu, type: t.type, vueParLeJuge: t.vueJuge, proches: t.proches })),
+      traces: G.tracesLoup.map(t => ({ jour: t.jour, heure: heure(t.minute), lieu: t.lieu, type: t.type, vueParLeJuge: t.vueJuge, signaleeAuJuge: !!t.signalee, proches: t.proches })),
       accusations: G.historique.accusations.map(a => ({ jour: a.jour, heure: heure(a.minute), accuse: a.nom, par: a.par, lieu: a.lieu, piece: a.piece, soutiens: a.soutiens, defenseurs: a.defenseurs })),
       conseils: G.historique.conseils.map(h => ({ jour: h.jour, heure: h.heure, resume: h.resume, elimine: h.elimine, accuses: h.accuses.map(x => ({ nom: x.nom, par: x.par, piece: x.piece, mains: x.mains, defense: x.defense, defenseSource: x.defenseSource || null })) })),
     },
@@ -1497,7 +1564,8 @@ function majJour(dt) {
       if (c.perso.fuit && dist(c, m) < 120 && c.parle.qui === c) { decision(c, "conversation", "ne pas être entendu", ["continuer", "couper court et partir"], "couper court et partir", `personnalité méfiante : le juge approche (${Math.round(dist(c, m))} < 120)`); c.parle.lignes = c.parle.lignes.slice(0, c.parle.k + 1); c.bulle = { texte: "… On en reparlera.", fin: perf() + 2500 }; c.cooldown = 10; finirConv(c.parle); allerA(c, pick(Object.keys(LIEUX).filter(l => l !== c.lieu))); continue; }
       continue;
     }
-    if (c.chemin.length) { marcher(c, 82 * dt); continue; }
+    if (c.court && G.prologue && !G.prologue.annonce && (dist(c, LIEUX.place) < 130 || !c.chemin.length)) annoncerMouton(c);   // arrivé, ou arrêté en route
+    if (c.chemin.length) { marcher(c, (c.court ? 140 : 82) * dt); continue; }
     c.prochain -= dt;
     if (c.prochain <= 0) {
       if (G.minute >= heureCloche()) { if (c.but !== "place" || dist(c, LIEUX.place) > 120) { allerA(c, "place"); decision(c, "deplacement", "rejoindre le conseil", ["place"], "place", "la cloche a sonné"); } c.prochain = 3; }
@@ -1692,10 +1760,12 @@ function dessiner(t) {
   // empreintes
   for (const tr of G.traces) {
     ctx.fillStyle = tr.matiere === "farine" ? "rgba(250,248,240,.85)" : tr.matiere === "suie" ? "rgba(25,25,28,.8)" : tr.matiere === "eau" ? "rgba(70,110,140,.75)" : tr.matiere === "paille" ? "rgba(225,190,90,.85)" : tr.matiere === "cire" ? "rgba(245,235,200,.85)" : tr.matiere === "bière" ? "rgba(160,110,40,.8)" : "rgba(70,50,30,.8)";
-    tr.pts.forEach((p, k) => { if (k % 2) return; const o = (k % 4 ? 5 : -5); ctx.beginPath(); ctx.ellipse(p.x + o, p.y + o * .4, 3.5, 2.4, 0, 0, 7); ctx.fill(); });
+    ctx.globalAlpha = .6;   // piste de nuit : des pas réguliers, discrets
+    tr.pts.forEach((p, k) => { if (k % 2) return; const o = (k % 4 ? 5 : -5); ctx.beginPath(); ctx.ellipse(p.x + o, p.y + o * .4, 3, 2, 0, 0, 7); ctx.fill(); });
+    ctx.globalAlpha = 1;
   }
   // traces de loup que le juge a trouvées
-  for (const tr of G.tracesLoup) if (tr.vueJuge && dist(tr, G.moi) < VUE) traceLoup(ctx, tr);
+  for (const tr of G.tracesLoup) if ((tr.vueJuge || tr.signalee) && dist(tr, G.moi) < VUE) traceLoup(ctx, tr, t);
   // corps (visibles seulement à portée de regard)
   if (!nuit) for (const k of G.corps) if (dist(k, G.moi) < VUE) corpsAuSol(ctx, k);
   // cercle de la scène d'accusation
@@ -1768,8 +1838,9 @@ function dessiner(t) {
   if (!nuit && G.phase === "jour") { const [sx, sy] = ecran(G.moi.x, G.moi.y); ctx.setLineDash([3, 6]); ctx.strokeStyle = "rgba(255,240,200,.35)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy, OUIE * z, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
   rendreHorloge();
 }
-function traceLoup(g, tr) {
-  g.save(); g.translate(tr.x, tr.y); g.rotate(tr.angle); g.scale(1.5, 1.5);
+function traceLoup(g, tr, t) {   // trace de crise : cerclée de la couleur de la lanterne, pour ne pas la confondre avec une piste de nuit
+  g.save(); g.strokeStyle = `rgba(229,168,75,${.55 + .25 * Math.sin(t / 400)})`; g.lineWidth = 2; g.setLineDash([3, 3]); g.beginPath(); g.arc(tr.x, tr.y, 15, 0, 7); g.stroke(); g.restore();
+  g.save(); g.translate(tr.x, tr.y); g.rotate(tr.angle); g.scale(1.7, 1.7);
   if (tr.type.startsWith("empreintes")) { g.fillStyle = "rgba(45,30,20,.85)"; g.beginPath(); g.ellipse(0, 3, 4.5, 3.5, 0, 0, 7); g.fill(); for (const [x, y] of [[-4, -3], [-1.5, -5], [1.5, -5], [4, -3]]) { g.beginPath(); g.arc(x, y, 1.4, 0, 7); g.fill(); } }
   else if (tr.type.startsWith("touffe")) { g.strokeStyle = "rgba(170,170,175,.95)"; g.lineWidth = 1.2; for (let k = 0; k < 7; k++) { g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(k) * 7, Math.sin(k * 1.7) * 5); g.stroke(); } }
   else if (tr.type.startsWith("griffures")) { g.strokeStyle = "rgba(60,30,20,.9)"; g.lineWidth = 1.6; for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(k * 4 - 3, -6); g.lineTo(k * 4 + 3, 6); g.stroke(); } }

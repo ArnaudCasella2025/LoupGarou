@@ -180,3 +180,21 @@ Demande du joueur : un mode debug qui enregistre les décisions de chaque PNJ, e
   - le carnet complet du juge.
   - Il passe par la capacité `downloads` de l'artefact (le visiteur confirme), sinon par un téléchargement ordinaire.
   - Il contient les rôles : à ouvrir après la partie.
+
+### v7.2 : retours sur la partie du 06/10 (piège, budget, déplacements, paroles tenues)
+
+- **Le piège :**
+  - Le loup se poste sur le chemin, à 190 du centre du lieu piégé.
+  - Pendant la crise, il entre dans le lieu : la piste y mène, mesuré de 290 à 4 unités du centre.
+  - À partir du jour 2, il guette ensuite une heure de jeu et attaque qui arrive seul. Il lève le guet s'il a attaqué, ou si personne n'est venu.
+- **Le budget de Claude :**
+  - Ce qui répond au juge garde ses 22 appels par jour.
+  - Les conversations entre villageois et les témoins ont désormais 16 appels à part.
+  - L'export compte les appels refusés faute de budget.
+- **« Changer de lieu »** ne retombe plus sur le lieu actuel : on prend un autre lieu de la routine, sinon un lieu voisin, en évitant les lieux à l'écart si la peur est forte.
+- **Les paroles tenues :**
+  - Les répliques de Claude ont un champ « va » : quand un villageois annonce qu'il part quelque part, le moteur l'y envoie.
+  - Il ne part pas s'il suit le juge, s'il est pris dans une scène, après la cloche, ou si c'est le loup en chasse ou en crise.
+  - Le loup peut promettre sans y aller.
+  - Le journal note chaque promesse, tenue ou non, y compris un « j'y vais » sans lieu, signalé comme une promesse en l'air.
+- **Journal :** la question libre du juge est notée « libre » quand Claude répond, au lieu de la catégorie du script.

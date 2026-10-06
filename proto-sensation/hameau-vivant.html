@@ -276,7 +276,7 @@ const parNom = n => G.ias.find(c => c.nom === n);
 function choisirLieu(c, note = {}) {   // note : rempli pour le journal de debug (options, raison)
   const p = c.perso, per = periode(G.minute), liste = p[per];
   note.options = [...liste, "n'importe où (18 %)"];
-  if (rnd() < .18) { const l = pick(Object.keys(LIEUX)); note.raison = "écart au hasard (18 %)"; return l; }
+  if (rnd() < .18) { const l = pick(Object.keys(LIEUX).filter(k => k !== c.lieu)); note.raison = "écart au hasard (18 %)"; return l; }
   const tire = pick(liste);
   let choix = tire, raison = `routine du ${per} (${liste.join(", ")}) : ${tire}`;
   if (choix === "*foule") { const cpt = {}; for (const o of vivantsIA()) if (o !== c && o.lieu) cpt[o.lieu] = (cpt[o.lieu] || 0) + 1; choix = Object.entries(cpt).sort((a, b) => b[1] - a[1])[0]?.[0] || "place"; raison += ` → là où il y a le plus de monde (${JSON.stringify(cpt)})`; }
@@ -284,6 +284,11 @@ function choisirLieu(c, note = {}) {   // note : rempli pour le journal de debug
   else if (choix === "*ailleurs") { choix = pick(Object.keys(LIEUX).filter(l => l !== c.lieu)); raison += " → un autre lieu que l'actuel"; }
   else if (choix === "*suivre") { const o = pick(vivantsIA().filter(o => o !== c)); choix = o?.but || o?.lieu || "place"; raison += ` → suit ${o ? o.nom : "personne"}`; }
   if (G.peur >= 2 && ECARTS.includes(choix) && rnd() < .6) { const avant = choix; choix = pick(["place", "taverne", "forge"]); raison += ` ; la peur (${G.peur}) l'écarte de ${avant} (60 %)`; }   // la peur regroupe
+  if (c.lieu && choix === c.lieu) {   // « changer de lieu » doit le faire bouger : un autre lieu de sa routine, sinon un lieu voisin
+    const autres = liste.filter(l => LIEUX[l] && l !== c.lieu), voisins = NOEUDS[c.lieu].v.filter(n => LIEUX[n] && !(G.peur >= 2 && ECARTS.includes(n)));
+    choix = autres.length ? pick(autres) : pick(voisins.length ? voisins : ["place"]);
+    raison += ` ; déjà ${LIEUX[c.lieu].a} : ${autres.length ? "autre lieu de sa routine" : "lieu voisin"}, ${LIEUX[choix].court}`;
+  }
   // le loup cherche à croiser quelqu'un l'après-midi s'il n'a encore repéré personne
   if (c.loup && per === "aprem" && !rencontresDuJour(c).length) { const o = pick(vivantsIA().filter(o => o !== c && o.lieu)); if (o) { choix = o.lieu; raison += ` ; loup sans rencontre l'après-midi : va vers ${o.nom}`; } }
   note.raison = raison;
@@ -474,7 +479,7 @@ function aube() {
   G.tracesLoup = G.tracesLoup.filter(t => t.jour >= G.jour - 1);
   G.crise = planifierCrise(G.jour);
   Object.assign(G, { nuit: null, loupMarche: null, phase: "jour", minute: JOUR_DEBUT, mortDuJour: false, essais: 0, chasse: { etat: "routine", t: 0 }, lutte: null, accuses: [], scene: null, flagrant: null, accIA: { dernier: 0, loupFait: G.accIA.loupFait }, cloche: false });
-  IA.appelsJour = 0;
+  IA.appelsJour = 0; IA.appelsFondJour = 0;
   for (const [k, c] of vivantsIA().entries()) { const a = (k / 7) * Math.PI * 2; c.x = LIEUX.place.x + Math.cos(a) * 75; c.y = LIEUX.place.y + Math.sin(a) * 55; c.chemin = []; c.prochain = 1 + rnd() * 4; c.ruban = false; c.signe = null; c.enScene = false; }
   G.moi.x = LIEUX.place.x; G.moi.y = LIEUX.place.y + 70;
   if (v) {
@@ -517,7 +522,7 @@ function chasser(dt) {
   if (C.etat === "fuite") { if (!L.chemin.length) finirFuite(); return; }
   const motifs = [[G.jour < 2, "jour 1 : pas de chasse"], [G.mortDuJour, "a déjà tué (ou tenté) aujourd'hui"], [G.essais >= R.essaisMax, `${R.essaisMax} attaques déjà tentées`],
     [G.minute < R.debutChasse, "trop tôt (avant 9h)"], [G.minute > R.finChasse, "trop tard (après 17h45)"], [G.scene, "une accusation est en cours"], [G.dialogueAvec === L, "parle avec le juge"],
-    [L.enScene, "pris dans une scène"], [L.suit, "suit le juge"], [criseEnCours(), "crise en préparation ou en cours"]];
+    [L.enScene, "pris dans une scène"], [L.suit, "suit le juge"], [criseEnCours(), "crise en cours (mise en place, traces ou guet du piège)"]];
   const bloque = motifs.find(m => m[0]);
   if (bloque) {
     if (L.dbgChasse !== bloque[1]) { L.dbgChasse = bloque[1]; decision(L, "chasse", "tuer un villageois croisé aujourd'hui", ["chasser", "attendre"], "attendre", bloque[1]); }
@@ -562,11 +567,11 @@ function chasser(dt) {
     }
     const jugeEstime = dist(G.moi, v) * C.erreur;
     if (dist(L, v) < 280) { if (!isolee(v, L)) G.stats.bloqueIsole++; else if (jugeEstime <= VUE * 1.05) G.stats.bloqueJuge++; }
-    const frein = dist(L, v) >= 280 ? `trop loin (${Math.round(dist(L, v))})` : !isolee(v, L) ? `${v.nom} n'est pas seul` : jugeEstime <= VUE * 1.05 ? `le juge semble assez près pour voir (estimé ${Math.round(jugeEstime)} ≤ ${Math.round(VUE * 1.05)})` : v.parle ? `${v.nom} parle avec quelqu'un` : G.dialogueAvec === v ? `${v.nom} parle avec le juge` : null;
+    const frein = dist(L, v) >= 280 ? `trop loin (${Math.round(dist(L, v))})` : !isolee(v, L) ? `${v.nom} n'est pas seul${accord(v.nom, "", "e")}` : jugeEstime <= VUE * 1.05 ? `le juge semble assez près pour voir (estimé ${Math.round(jugeEstime)} ≤ ${Math.round(VUE * 1.05)})` : v.parle ? `${v.nom} parle avec quelqu'un` : G.dialogueAvec === v ? `${v.nom} parle avec le juge` : null;
     const cle = frein && frein.split(" (")[0];   // sans les distances, qui changent à chaque image
     if (cle !== C.freinCle && frein && !frein.startsWith("trop loin")) decision(L, "chasse", `tuer ${v.nom}`, ["attaquer", "continuer la filature"], "continuer la filature", frein);
     C.freinCle = cle; if (frein && !frein.startsWith("trop loin")) C.frein = frein;
-    if (!frein) { decision(L, "chasse", `tuer ${v.nom}`, ["attaquer", "continuer la filature"], "attaquer", `${v.nom} est seul ${ouEst(v)}, juge estimé à ${Math.round(jugeEstime)} (réel ${Math.round(dist(G.moi, v))}) ; essai ${G.essais + 1}/${R.essaisMax}`); C.etat = "attaque"; G.essais++; G.stats.attaques++; }
+    if (!frein) { decision(L, "chasse", `tuer ${v.nom}`, ["attaquer", "continuer la filature"], "attaquer", `${v.nom} est seul${accord(v.nom, "", "e")} ${ouEst(v)}, juge estimé à ${Math.round(jugeEstime)} (réel ${Math.round(dist(G.moi, v))}) ; essai ${G.essais + 1}/${R.essaisMax}`); C.etat = "attaque"; G.essais++; G.stats.attaques++; }
     return;
   }
   if (C.etat === "attaque") {
@@ -679,7 +684,7 @@ function planifierCrise(jour) {
   const debut = 9 * 60 + Math.floor(rnd() * 7 * 60);   // entre 9h et 16h
   return { id: `${jour}-${debut}`, jour, debut, duree: 9, phase: "attente", strategie: null, cible: null, raison: null, decision: false, dernier: null, dernierMin: 0, nb: 0, decouverte: false, annonce: false };
 }
-const criseEnCours = () => G.crise && (G.crise.phase === "active" || G.crise.phase === "preparation");
+const criseEnCours = () => G.crise && ["preparation", "active", "guet"].includes(G.crise.phase);
 function texteCrise() {
   const K = G.crise; if (!K || K.phase === "finie") return "";
   return `\nTA CRISE D'AUJOURD'HUI : vers ${heureDite(K.debut)}, pendant quelques minutes, tu laisseras malgré toi des traces (empreintes de pattes, poils, griffures) partout où tu passeras. Elles n'apparaissent aux yeux des autres qu'un peu plus tard ; celui qui les trouve peut deviner l'heure et chercher qui était là.${K.strategie ? ` Ta stratégie : ${STRATEGIES[K.strategie]}${K.cible ? ` (${K.cible})` : ""}.` : ""}`;
@@ -718,18 +723,25 @@ function allerVersMaison(c, maison) {
   const depart = dans(c.x, c.y) || lieuProche(c.x, c.y);
   c.chemin = cheminNoeuds(depart, maison.id).slice(1).map(n => ({ x: NOEUDS[n].x + (rnd() - .5) * 16, y: NOEUDS[n].y + (rnd() - .5) * 16 }));
 }
+function approcher(L, lieu, marge) {   // s'arrêter sur le chemin qui mène au lieu, à « marge » de son centre : les derniers pas, pendant la crise, laisseront la piste
+  const depart = dans(L.x, L.y) || lieuProche(L.x, L.y), C = LIEUX[lieu];
+  const avant = NOEUDS[lieu].v.find(n => LIEUX[n] && n !== "place") || "place";
+  const pts = tracerChemin(depart === lieu ? [lieu, avant, lieu] : cheminNoeuds(depart, lieu));   // déjà sur place : sortir puis revenir
+  let k = pts.length - 1; while (k > 0 && Math.hypot(pts[k].x - C.x, pts[k].y - C.y) < marge) k--;
+  L.chemin = pts.slice(1, k + 1).filter((p, i, a) => i % 4 === 0 || i === a.length - 1); L.but = lieu;
+}
 function preparer(K, L) {   // se mettre en place avant la crise
   if (L.parle) finirConv(L.parle);
   if (L.suit) liberer(L, "Je dois m'absenter un moment.");
   if (K.strategie === "eloigner") { K.lieuIsole = ecartLePlusVide(L); allerA(L, K.lieuIsole); }
   else if (K.strategie === "fausse_piste") { const o = parNom(K.cible); if (o && o.vivant) allerA(L, o.maison.lieu); else { K.strategie = "eloigner"; K.cible = null; allerA(L, ecartLePlusVide(L)); } }
-  else if (K.strategie === "piege") { K.lieuPiege ||= ecartLePlusVide(L); const avant = NOEUDS[K.lieuPiege].v.find(n => LIEUX[n] && n !== "place") || "place"; allerA(L, avant); }
-  decision(L, "crise", `se mettre en place pour « ${K.strategie} »`, null, K.strategie === "accuser" ? `se coller à ${K.cible}` : L.but ? `aller ${LIEUX[L.but].a}` : "rester", `crise à ${heureDite(K.debut)}, dans 40 minutes`);
+  else if (K.strategie === "piege") { K.lieuPiege ||= ecartLePlusVide(L); approcher(L, K.lieuPiege, 190); }
+  decision(L, "crise", `se mettre en place pour « ${K.strategie} »`, null, K.strategie === "accuser" ? `se coller à ${K.cible}` : K.strategie === "piege" ? `attendre sur le chemin, à 190 du centre ${LIEUX[K.lieuPiege].de}` : L.but ? `aller ${LIEUX[L.but].a}` : "rester", `crise à ${heureDite(K.debut)}, dans 40 minutes`);
   G.crises.push(K);
 }
 function lancerStrategie(K, L) {   // la crise commence : les derniers pas laissent la piste
   if (K.strategie === "fausse_piste") { const o = parNom(K.cible); if (o && o.vivant) allerVersMaison(L, o.maison); }
-  else if (K.strategie === "piege") allerA(L, K.lieuPiege);
+  else if (K.strategie === "piege") { const C = LIEUX[K.lieuPiege], a = rnd() * 6.28; L.chemin = [{ x: C.x + Math.cos(a) * C.r * .3, y: C.y + Math.sin(a) * C.r * .2 }]; }
 }
 function majCrise(dt) {
   const K = G.crise, L = loupDe(); if (!K || !L.vivant || G.phase !== "jour") return;
@@ -749,12 +761,19 @@ function majCrise(dt) {
   if (K.phase === "active") {
     if (G.chasse.etat === "lutte" || G.chasse.etat === "fuite") { if (G.minute >= K.debut + K.duree) K.phase = "finie"; else deposerSiBouge(K, L); return; }
     if (K.strategie === "accuser") { const o = parNom(K.cible); if (o && o.vivant) { const d = dist(L, o); L.chemin = d > 40 ? [{ x: o.x - 26, y: o.y + 12 }] : []; } }
-    if (K.strategie === "piege" && G.jour >= 2 && !G.mortDuJour && !G.lutte && G.essais < R.essaisMax) {
-      const proie = vivantsIA().find(o => o !== L && !o.loup && dist(o, L) < 120 && !o.enScene && !o.suit && isolee(o, L) && dist(G.moi, o) > VUE * 1.05);
-      if (proie) { decision(L, "chasse", "dévorer qui suit la piste du piège", ["attaquer", "attendre"], "attaquer", `${proie.nom} arrive seul ${ouEst(proie)}`); G.essais++; G.stats.attaques++; commencerLutte(L, proie); return; }
-    }
+    if (piegeTendu(K, L)) return;
     deposerSiBouge(K, L);
-    if (G.minute >= K.debut + K.duree) { K.phase = "finie"; L.prochain = 1; L.chemin = []; }
+    if (G.minute >= K.debut + K.duree) {
+      if (K.strategie === "piege" && G.jour >= 2 && !G.mortDuJour) { K.phase = "guet"; K.finGuet = G.minute + 60; decision(L, "crise", `guetter au piège ${LIEUX[K.lieuPiege].a}`, ["guetter une heure", "reprendre sa routine"], "guetter une heure", "la piste mène ici : il attend qui la suivra seul"); }
+      else { K.phase = "finie"; L.prochain = 1; L.chemin = []; }
+    }
+    return;
+  }
+  if (K.phase === "guet") {   // le piège après la crise : il attend sur place, sans laisser de traces
+    if (G.chasse.etat === "lutte" || G.chasse.etat === "fuite") return;
+    const fin = G.mortDuJour ? "a dévoré ou attaqué quelqu'un" : G.minute >= K.finGuet ? "personne n'est venu seul en une heure" : G.essais >= R.essaisMax ? "plus d'essai d'attaque aujourd'hui" : null;
+    if (fin) { K.phase = "finie"; L.prochain = 1; L.chemin = []; decision(L, "crise", `guetter au piège ${LIEUX[K.lieuPiege].a}`, ["continuer", "lever le guet"], "lever le guet", fin); return; }
+    piegeTendu(K, L);
     return;
   }
   // après coup : en « accuser », le loup fait mine de découvrir les traces et désigne sa cible
@@ -768,6 +787,14 @@ function majCrise(dt) {
     ecouterAutour(L, null, texte, L.lieu);
     if (dist(G.moi, L) < OUIE) noter("entendu", `${L.nom} : « ${texte} »`);
   }
+}
+function piegeTendu(K, L) {   // pendant la crise ou le guet : dévorer qui arrive seul au piège
+  if (K.strategie !== "piege" || G.jour < 2 || G.mortDuJour || G.lutte || G.essais >= R.essaisMax) return false;
+  const proie = vivantsIA().find(o => o !== L && !o.loup && dist(o, L) < 120 && !o.enScene && !o.suit && isolee(o, L) && dist(G.moi, o) > VUE * 1.05);
+  if (!proie) return false;
+  decision(L, "chasse", "dévorer qui suit la piste du piège", ["attaquer", "attendre"], "attaquer", `${proie.nom} arrive seul${accord(proie.nom, "", "e")} ${ouEst(proie)} (${K.phase === "guet" ? "pendant le guet" : "pendant la crise"})`);
+  G.essais++; G.stats.attaques++; commencerLutte(L, proie);
+  return true;
 }
 function deposerSiBouge(K, L) {
   const bouge = Math.hypot(L.x - K.dernier.x, L.y - K.dernier.y);
@@ -889,7 +916,8 @@ async function parlerAuxPresents(texte) {
     c.attend = false;
     if (!c.vivant) return;
     const rep = r ? r.texte : repondre(c, cleScript(texte));
-    decision(c, "reponse", "répondre au juge devant tous", ["Claude", "script"], r ? "Claude" : "script", `${r ? "" : `question classée « ${cleScript(texte)} » ; `}répond : « ${rep} »${r && r.vise ? ` ; vise ${r.vise}` : ""}`);
+    decision(c, "reponse", "répondre au juge devant tous", ["Claude", "script"], r ? "Claude" : "script", `${r ? "" : `question classée « ${cleScript(texte)} » ; `}répond : « ${rep} »${r && r.vise ? ` ; vise ${r.vise}` : ""}${r && r.va ? ` ; va ${LIEUX[r.va].court}` : ""}`);
+    tenirParole(c, r);
     await new Promise(res => setTimeout(res, k * 900));   // les réponses arrivent l'une après l'autre
     c.bulle = { texte: rep, fin: perf() + 7000 };
     ecouterAutour(c, G.moi, rep, c.lieu);
@@ -1045,14 +1073,16 @@ function majScene() {
 
 /* ============================================================ IA (Claude, via la capacité sample) */
 let SAMPLE = null, DOWNLOADS = null;
-const IA = { mode: "script", niveau: "quick", file: [], enCours: 0, max: 2, pauseJusqua: 0, appelsJour: 0, appels: 0, echecs: 0, tokensIn: 0, tokensOut: 0, pret: false };
+const IA = { mode: "script", niveau: "quick", file: [], enCours: 0, max: 2, pauseJusqua: 0, appelsJour: 0, appelsFondJour: 0, horsBudget: 0, appels: 0, echecs: 0, tokensIn: 0, tokensOut: 0, pret: false };
 (async () => { try { SAMPLE = window.claude?.use ? await window.claude.use("sample") : null; } catch { SAMPLE = null; } IA.pret = true; majAccueil(); })();
 (async () => { try { DOWNLOADS = window.claude?.use ? await window.claude.use("downloads") : null; } catch { DOWNLOADS = null; } })();
 const ARRETS = ["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed", "session_expired"];
 function demander(prompt, prioritaire) {
   if (IA.mode !== "claude" || !SAMPLE || perf() < IA.pauseJusqua) return Promise.resolve(null);
-  if (IA.appelsJour >= (prioritaire ? 22 : 12)) return Promise.resolve(null);   // budget du jour : au-delà, répliques scriptées
-  IA.appelsJour++;
+  // budget du jour, au-delà répliques scriptées : 22 appels pour ce qui répond au juge, 16 à part pour ce qui se dit entre villageois
+  const cpt = prioritaire ? "appelsJour" : "appelsFondJour";
+  if (IA[cpt] >= (prioritaire ? 22 : 16)) { IA.horsBudget++; return Promise.resolve(null); }
+  IA[cpt]++;
   return new Promise(res => { const j = { prompt, res }; prioritaire ? IA.file.unshift(j) : IA.file.push(j); pomper(); });
 }
 function pomper() {
@@ -1127,7 +1157,8 @@ ${entendu.join("\n") || "- Rien."}
 
 ${tache}
 ${format || `Écris en français parlé, à voix haute, avec des phrases complètes, sans abréviations, une seule idée, ${maxMots} mots au maximum. Tu ne cites que des faits de ta mémoire ci-dessus${c.loup ? " (ou un mensonge cohérent)" : ""} ; si tu ne sais pas, dis-le. Ne parle jamais de toi à la troisième personne.
-Réponds uniquement par un objet JSON : {"texte": "ce que tu dis", "vise": "prénom de la personne que tu accuses, ou null"}`}`;
+Si tu annonces que tu pars quelque part maintenant, indique ce lieu dans « va » : tu t'y rendras vraiment${c.loup ? " (toi, le Loup, tu peux promettre sans y aller : mets alors null)" : ""}.
+Réponds uniquement par un objet JSON : {"texte": "ce que tu dis", "vise": "prénom de la personne que tu accuses, ou null", "va": "Place, Taverne, Forge, Chapelle, Grange, Moulin, Lavoir, ou null"}`}`;
 }
 function propre(c, r, max) {
   if (!r || typeof r.texte !== "string") return null;
@@ -1135,7 +1166,18 @@ function propre(c, r, max) {
   if (!t || (c.loup && /\bje suis (le |un )?loup/i.test(t))) return null;
   const m = t.split(" "); if (m.length > max + 10) t = m.slice(0, max + 10).join(" ") + "…";
   const v = typeof r.vise === "string" ? r.vise.trim() : "", cible = parNom(v);
-  return { texte: t, vise: cible && cible.vivant && cible !== c ? cible.nom : null };
+  return { texte: t, vise: cible && cible.vivant && cible !== c ? cible.nom : null, va: typeof r.va === "string" ? lieuDeNom(r.va) : null };
+}
+const lieuDeNom = s => { const t = s.toLowerCase().trim().replace(/^(à|au|a|vers)\s+/, "").replace(/^(la|le|l')\s*/, ""); return Object.keys(LIEUX).find(k => k === t || LIEUX[k].court.toLowerCase() === t) || null; };
+function tenirParole(c, r) {   // la réplique annonce un départ : le moteur l'exécute, ou note qu'elle reste lettre morte
+  if (!r || !c.vivant || G.phase !== "jour") return;
+  if (!r.va) { if (/\bj(e vais|'y vais|e pars|e file|'y cours|'y retourne)\b/i.test(r.texte)) decision(c, "promesse", "tenir ce qu'il vient d'annoncer", ["y aller", "rester"], "rester", `annonce un départ sans lieu dans « va » : « ${r.texte} »${c.loup ? " (loup : promesse en l'air ?)" : ""}`); return; }
+  const frein = c.suit ? "suit le juge" : c.enScene ? "pris dans une scène" : c.loup && (G.chasse.etat !== "routine" || criseEnCours()) ? "loup occupé (chasse ou crise)" : G.minute >= heureCloche() ? "la cloche a sonné" : c.lieu === r.va ? "déjà sur place" : null;
+  decision(c, "promesse", `tenir ce qu'il vient d'annoncer (aller ${LIEUX[r.va].a})`, ["y aller", "rester"], frein ? "rester" : "y aller", frein || `« ${r.texte} »`);
+  if (frein) return;
+  if (c.parle) finirConv(c.parle);
+  allerA(c, r.va); c.prochain = 10 + rnd() * 8;
+  evenement(c, `tu as annoncé que tu allais ${LIEUX[r.va].a}, et tu y es allé${accord(c.nom, "", "e")}`);
 }
 function cleScript(q) {   // réponse scriptée de secours à une question libre
   const V = derniereVictime(), t = q.toLowerCase();
@@ -1200,7 +1242,7 @@ function donneesPartie() {
       accusations: G.historique.accusations.map(a => ({ jour: a.jour, heure: heure(a.minute), accuse: a.nom, par: a.par, lieu: a.lieu, piece: a.piece, soutiens: a.soutiens, defenseurs: a.defenseurs })),
       conseils: G.historique.conseils.map(h => ({ jour: h.jour, heure: h.heure, resume: h.resume, elimine: h.elimine, accuses: h.accuses.map(x => ({ nom: x.nom, par: x.par, piece: x.piece, mains: x.mains, defense: x.defense, defenseSource: x.defenseSource || null })) })),
     },
-    ia: { appels: IA.appels, echecs: IA.echecs, tokensEntreeEstimes: IA.tokensIn, tokensSortieEstimes: IA.tokensOut },
+    ia: { appels: IA.appels, echecs: IA.echecs, refusesHorsBudget: IA.horsBudget, tokensEntreeEstimes: IA.tokensIn, tokensSortieEstimes: IA.tokensOut },
     personnages: G.ias.map(c => ({
       nom: c.nom, personnalite: c.perso.id, label: c.perso.label, role: c.loup ? "loup" : "villageois", vivant: c.vivant, elimine: !!c.elimine, maison: c.maison.id, quartier: c.maison.q,
       blesse: c.blesse, mensongesScriptes: c.mensonges, trouvaille: c.trouvaille || null, rencontres: c.vu, nuits: c.nuits, evenements: c.evenements, entendu: c.entendu,
@@ -1373,8 +1415,9 @@ async function direA(c, texte, cle) {
   let r = null;
   if (IA.mode === "claude") r = propre(c, await demander(vueIA(c, `Le juge est en face de toi${c.lieu ? " " + LIEUX[c.lieu].a : ""} et te dit : « ${texte} ». Réponds-lui directement.`, 40), true), 40);
   const rep = r ? r.texte : repondre(c, cle || cleScript(texte));
-  const q = cle || cleScript(texte), ment = c.loup && !r && ["croise", "avec", "nuit", "traces"].includes(q);
-  decision(c, "reponse", c.loup ? "répondre au juge sans se trahir" : "répondre au juge", ["Claude", "script"], r ? "Claude" : "script", `question « ${q} » ; répond : « ${rep} »${ment ? " ; réponse scriptée du loup : mensonge" : ""}${r && r.vise ? ` ; vise ${r.vise}` : ""}`);
+  const q = cle || (r ? "libre" : cleScript(texte)), ment = c.loup && !r && ["croise", "avec", "nuit", "traces"].includes(q);
+  decision(c, "reponse", c.loup ? "répondre au juge sans se trahir" : "répondre au juge", ["Claude", "script"], r ? "Claude" : "script", `question « ${q} »${r ? "" : " (catégorie du script)"} ; répond : « ${rep} »${ment ? " ; réponse scriptée du loup : mensonge" : ""}${r && r.vise ? ` ; vise ${r.vise}` : ""}${r && r.va ? ` ; va ${LIEUX[r.va].court}` : ""}`);
+  tenirParole(c, r);
   c.attend = false;
   if (!c.vivant) return;
   c.bulle = { texte: rep, fin: perf() + 7000 };
@@ -1506,10 +1549,10 @@ async function converserParClaude(cv) {
   if (cv.fini) return;
   const t1 = r1 ? r1.texte : (conversation(a, b) || [[a, pick(REACTIONS)]])[0][1];
   decision(a, "reponse", `parler à ${b.nom}`, ["Claude", "script"], r1 ? "Claude" : "script", `dit : « ${t1} »${r1 && r1.vise ? ` ; vise ${r1.vise}` : ""}`);
-  cv.lignes.push([a, t1]);
+  cv.lignes.push([a, t1]); (cv.paroles ||= []).push([a, r1]);
   const r2 = propre(b, await demander(vueIA(b, `${a.nom} vient de te dire ${ou} : « ${t1} ». Réponds-lui.`, 28)), 28);
   if (cv.fini) return;
-  cv.lignes.push([b, r2 ? r2.texte : pick(REACTIONS)]);
+  cv.lignes.push([b, r2 ? r2.texte : pick(REACTIONS)]); cv.paroles.push([b, r2]);
   decision(b, "reponse", `répondre à ${a.nom}`, ["Claude", "script"], r2 ? "Claude" : "script", `dit : « ${cv.lignes.at(-1)[1]} »${r2 && r2.vise ? ` ; vise ${r2.vise}` : ""}`);
   cv.attente = false;
 }
@@ -1529,7 +1572,11 @@ function avancerConv(cv, dt) {
   ecouterAutour(c, autre, texte, cv.lieu);
   if (dist(c, G.moi) < OUIE) noter("entendu", `${c.nom} à ${autre.nom} (${LIEUX[cv.lieu].court}) : « ${texte} »`, c);
 }
-function finirConv(cv) { cv.fini = true; for (const c of [cv.a, cv.b]) { if (c.parle === cv) c.parle = null; c.cooldown = 12 + rnd() * 10; c.prochain = 1 + rnd() * 3; } }
+function finirConv(cv) {
+  if (cv.fini) return;
+  cv.fini = true; for (const c of [cv.a, cv.b]) { if (c.parle === cv) c.parle = null; c.cooldown = 12 + rnd() * 10; c.prochain = 1 + rnd() * 3; }
+  for (const [c, r] of cv.paroles || []) tenirParole(c, r);
+}
 
 /* ============================================================ rendu */
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
